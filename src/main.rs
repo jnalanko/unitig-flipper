@@ -188,26 +188,39 @@ fn pick_orientations(dbg: &DBG) -> Vec<Orientation>{
 
     let mut visited = vec![false; dbg.unitigs.sequence_count()];
 
-    let mut stack = Vec::<(usize, Orientation)>::new();
-    stack.push((0, Orientation::Forward));
-
-    while let Some((unitig_id, orientation)) = stack.pop(){
-        if visited[unitig_id]{
+    let mut stack = Vec::<(usize, Orientation)>::new(); // Reused DFS stack between iterations
+    let mut n_components: usize = 0;    
+    for component_root in 0..dbg.unitigs.sequence_count(){
+        if visited[component_root]{
             continue;
         }
-        visited[unitig_id] = true;
-        orientations[unitig_id] = orientation;
 
-        for edge in dbg.edges[unitig_id].iter(){
-            let next_orientation = match (edge.from_orientation, edge.to_orientation){
-                (Orientation::Forward, Orientation::Forward) => orientation,
-                (Orientation::Forward, Orientation::Reverse) => orientation.flip(),
-                (Orientation::Reverse, Orientation::Forward) => orientation.flip(),
-                (Orientation::Reverse, Orientation::Reverse) => orientation,
-            };
-            stack.push((edge.to, next_orientation));
+        n_components += 1;
+        // Arbitrarily orient the root as forward        
+        stack.push((component_root, Orientation::Forward));
+
+        // DFS from root and orient all reachable unitigs the same way
+        while let Some((unitig_id, orientation)) = stack.pop(){
+            if visited[unitig_id]{
+                continue;
+            }
+
+            visited[unitig_id] = true;
+            orientations[unitig_id] = orientation;
+    
+            for edge in dbg.edges[unitig_id].iter(){
+                let next_orientation = match (edge.from_orientation, edge.to_orientation){
+                    (Orientation::Forward, Orientation::Forward) => orientation,
+                    (Orientation::Forward, Orientation::Reverse) => orientation.flip(),
+                    (Orientation::Reverse, Orientation::Forward) => orientation.flip(),
+                    (Orientation::Reverse, Orientation::Reverse) => orientation,
+                };
+                stack.push((edge.to, next_orientation));
+            }
         }
     }
+
+    eprintln!("Found {} component{}", n_components, match n_components > 1 {true => "s", false => ""});
 
     orientations
 }
