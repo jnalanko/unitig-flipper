@@ -15,6 +15,14 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
     let mut stack = Vec::<(usize, Orientation)>::new(); // Reused DFS stack between iterations
     let mut n_components: usize = 0;    
     for component_root in 0..dbg.unitigs.sequence_count(){
+        let is_source = dbg.edges[component_root].iter().all(|edge| edge.from_orientation == Orientation::Forward);
+        let is_self_loop = dbg.edges[component_root].iter().all(|edge| edge.from == edge.to);
+
+        if !is_source && !is_self_loop {
+            // This node will be visited from some other node
+            continue;
+        }
+
         if visited[component_root]{
             continue;
         }
@@ -35,13 +43,11 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
             orientations[unitig_id] = orientation;
     
             for edge in dbg.edges[unitig_id].iter(){
-                let next_orientation = match (edge.from_orientation, edge.to_orientation){
-                    (Orientation::Forward, Orientation::Forward) => orientation,
-                    (Orientation::Forward, Orientation::Reverse) => orientation.flip(),
-                    (Orientation::Reverse, Orientation::Forward) => orientation.flip(),
-                    (Orientation::Reverse, Orientation::Reverse) => orientation,
+               match (edge.from_orientation, edge.to_orientation){
+                    (Orientation::Forward, Orientation::Forward) => stack.push((edge.to, Orientation::Forward)),
+                    (Orientation::Forward, Orientation::Reverse) => stack.push((edge.to, Orientation::Reverse)),
+                    (Orientation::Reverse, _) => () // This edge would move backwards to a predecessor, so we don't follow it
                 };
-                stack.push((edge.to, next_orientation));
             }
         }
         eprintln!("Component size = {}", component_size);
