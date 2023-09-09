@@ -106,7 +106,6 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
     orientations
 }
 
-//fn run<R: jseqio::reader::SeqRecordProducer, W: jseqio::writer::SeqRecordWriter>(seqs_in: R, mut seqs_out: R, k: usize){
 fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWriter, k: usize){
 
     eprintln!("Building bidirected DBG edges");
