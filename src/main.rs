@@ -44,8 +44,8 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
     
             for edge in dbg.edges[unitig_id].iter(){
                match (edge.from_orientation, edge.to_orientation){
-                    (Orientation::Forward, Orientation::Forward) => stack.push((edge.to, Orientation::Forward)),
-                    (Orientation::Forward, Orientation::Reverse) => stack.push((edge.to, Orientation::Reverse)),
+                    (Orientation::Forward, Orientation::Forward) => stack.push((edge.to, orientation)),
+                    (Orientation::Forward, Orientation::Reverse) => stack.push((edge.to, orientation.flip())),
                     (Orientation::Reverse, _) => () // This edge would move backwards to a predecessor, so we don't follow it
                 };
             }
