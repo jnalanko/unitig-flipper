@@ -60,6 +60,37 @@ fn rc(c: u8) -> u8{
     }
 }
 
+/*
+        borders.get(last).unwrap().iter().for_each(|&MapValue{unitig_id, position}|{
+            match position{
+                Position::Start => {
+                    let edge = Edge{
+                        from: i,
+                        to: unitig_id,
+                        from_orientation: Orientation::Forward,
+                        to_orientation: Orientation::Forward,
+                    };
+                    edges[i].push(edge); // Does not work as an edge
+                }
+                Position::End => ()
+            }
+        });
+
+*/
+
+
+fn push_edges(from: usize, from_orientation: Orientation, to_orientation: Orientation, to_position: Position, linking_kmer: &[u8], edges: &mut Vec<Vec<Edge>>, borders: &HashMap<Vec<u8>, Vec<MapValue>>){
+    if let Some(vec) = borders.get(linking_kmer){
+        for x in vec.iter(){
+            if matches!(x.position, to_position) {
+                let edge = Edge{from, to: x.unitig_id, from_orientation, to_orientation};
+                edges[from].push(edge);
+            }
+        }
+    }
+}
+
+
 fn build_dbg(unitigs: SeqDB, k: usize) -> DBG{
     let mut borders: HashMap<Vec<u8>, Vec<MapValue>> = HashMap::new(); // (k-1)-mer to locations of that k-mer
 
@@ -108,75 +139,12 @@ fn build_dbg(unitigs: SeqDB, k: usize) -> DBG{
         let first_rc = &unitig_rc.seq[unitig_rc.seq.len()-(k-1)..];
         let last_rc = &unitig_rc.seq[..k-1];
 
-        // Forward -> Forward edges
-        borders.get(last).unwrap().iter().for_each(|&MapValue{unitig_id, position}|{
-            match position{
-                Position::Start => {
-                    let edge = Edge{
-                        from: i,
-                        to: unitig_id,
-                        from_orientation: Orientation::Forward,
-                        to_orientation: Orientation::Forward,
-                    };
-                    edges[i].push(edge); // Does not work as an edge
-                }
-                Position::End => ()
-            }
-        });
 
-        // Forward -> Reverse edges
-        if borders.contains_key(last_rc){
-            borders.get(last_rc).unwrap().iter().for_each(|&MapValue{unitig_id, position}|{
-                match position {
-                    Position::End => {
-                        let edge = Edge{
-                            from: i,
-                            to: unitig_id,
-                            from_orientation: Orientation::Forward,
-                            to_orientation: Orientation::Reverse,
-                        };
-                        edges[i].push(edge);
-                    }
-                    Position::Start => () // Does not work as an edge
-                }
-            });
-        }
+        push_edges(i, Orientation::Forward, Orientation::Forward, Position::Start, last, &mut edges, &borders);
+        push_edges(i, Orientation::Forward, Orientation::Reverse, Position::End, last_rc, &mut edges, &borders);
+        push_edges(i, Orientation::Reverse, Orientation::Reverse, Position::End, first, &mut edges, &borders);
+        push_edges(i, Orientation::Reverse, Orientation::Forward, Position::Start, first_rc, &mut edges, &borders);
 
-        // Reverse -> Reverse edges
-        if borders.contains_key(first){
-            borders.get(first).unwrap().iter().for_each(|&MapValue{unitig_id, position}|{
-                match position {
-                    Position::End => {
-                        let edge = Edge{
-                            from: i,
-                            to: unitig_id,
-                            from_orientation: Orientation::Reverse,
-                            to_orientation: Orientation::Reverse,
-                        };
-                        edges[i].push(edge);
-                    }
-                    Position::Start => () // Does not work as an edge
-                }
-            });
-        }
-
-        // Reverse -> Forward edges
-        if borders.contains_key(first_rc){
-            borders.get(first_rc).unwrap().iter().for_each(|&MapValue{unitig_id, position}|{
-                match position {
-                    Position::Start => {
-                        let edge = Edge{
-                            from: i,
-                            to: unitig_id,
-                            from_orientation: Orientation::Reverse,
-                            to_orientation: Orientation::Forward,
-                        };
-                        edges[i].push(edge);
-                    }
-                    Position::End => () // Does not work as an edge
-                }
-            });
-        }
     }
 
     DBG {unitigs, edges}
