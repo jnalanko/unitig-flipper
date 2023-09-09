@@ -11,7 +11,7 @@ git submodule update --init
 cargo build --release
 ```
 
-This produces the binary to `target/release/unitig_flipper`. If you want to install the program to $PATH, run `cargo install --path .`
+This produces the binary to `target/release/unitig_flipper`. If you want to install the program to `$PATH`, run `cargo install --path .`
 
 ```
 Usage: unitig_flipper --input <input> --output <output> -k <k>
