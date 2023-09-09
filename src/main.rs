@@ -72,7 +72,7 @@ fn main() {
             .value_parser(clap::value_parser!(std::path::PathBuf))
         )
         .arg(Arg::new("k")
-            .help("k-mer length of the unitigs")
+            .help("k-mer length")
             .short('k')
             .required(true)
             .value_parser(clap::value_parser!(usize))
