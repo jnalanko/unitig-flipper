@@ -56,11 +56,18 @@ fn main() {
     let k = std::env::args().nth(2).unwrap().parse::<usize>().unwrap();
     let reader = DynamicFastXReader::from_file(&filename).unwrap();
     let filetype = reader.filetype();
+
+    eprintln!("Reading sequences into memory");
     let (db, rc_db) = reader.into_db_with_revcomp().unwrap();
+
+    eprintln!("Building bidirected DBG edges");
     let dbg = dbg::build_dbg(db, rc_db, k);
+
+    eprintln!("Choosing unitig orientations");
     let orientations = pick_orientations(&dbg);
 
-    // Todo: gzip
+    eprintln!("Writing output to stdout");
+    // Todo: gzip output
     let mut writer = jseqio::writer::DynamicFastXWriter::new_to_stdout(filetype, false);
     for i in 0..dbg.unitigs.sequence_count(){
         let orientation = orientations[i];
