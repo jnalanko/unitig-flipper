@@ -1,11 +1,15 @@
 mod dbg;
 
-use jseqio::reader::DynamicFastXReader;
+use std::path::PathBuf;
+
+use jseqio::reader::{DynamicFastXReader, SeqRecordProducer};
 use jseqio::record::*;
 use clap::{Command, Arg};
 
 use dbg::Orientation;
 use dbg::Orientation::{Forward, Reverse};
+use jseqio::seq_db::SeqDB;
+use jseqio::writer::{DynamicFastXWriter, SeqRecordWriter};
 
 fn is_terminal(dbg: &dbg::DBG, unitig_id: usize) -> bool{
     let mut has_fw = false;
@@ -102,52 +106,16 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
     orientations
 }
 
-fn main() {
-
-    let cli = Command::new("unitig-flipper")
-        .about("Orients unitigs heuristically to minimize the number of dummy nodes in the SBWT graph.")
-        .author("Jarno N. Alanko <alanko.jarno@gmail.com>")
-        .arg(Arg::new("input")
-            .help("Input FASTA or FASTQ file, possibly gzipped")
-            .long("input")
-            .short('i')
-            .required(true)
-            .value_parser(clap::value_parser!(std::path::PathBuf))
-        )
-        .arg(Arg::new("output")
-            .help("Output FASTA or FASTQ file, possibly gzipped")
-            .long("output")
-            .short('o')
-            .required(true)
-            .value_parser(clap::value_parser!(std::path::PathBuf))
-        )
-        .arg(Arg::new("k")
-            .help("k-mer length")
-            .short('k')
-            .required(true)
-            .value_parser(clap::value_parser!(usize))
-        );
-
-    let cli_matches = cli.get_matches();
-    let infile: &std::path::PathBuf = cli_matches.get_one("input").unwrap();
-    let outfile: &std::path::PathBuf = cli_matches.get_one("output").unwrap();
-    let k: usize = *cli_matches.get_one("k").unwrap();
-
-    let reader = DynamicFastXReader::from_file(infile).unwrap();
-
-    // Let's also open the writer right away so it errors out if the file cannot be opened
-    let mut writer = jseqio::writer::DynamicFastXWriter::new_to_file(outfile).unwrap();
-
-    eprintln!("Reading and reverse-complementing sequences from {} into memory", infile.display());
-    let (db, rc_db) = reader.into_db_with_revcomp().unwrap();
+//fn run<R: jseqio::reader::SeqRecordProducer, W: jseqio::writer::SeqRecordWriter>(seqs_in: R, mut seqs_out: R, k: usize){
+fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWriter, k: usize){
 
     eprintln!("Building bidirected DBG edges");
-    let dbg = dbg::build_dbg(db, rc_db, k);
+    let dbg = dbg::build_dbg(forward_seqs, reverse_seqs, k);
 
     eprintln!("Choosing unitig orientations");
     let orientations = pick_orientations(&dbg);
 
-    eprintln!("Writing output to {}", outfile.display());
+    eprintln!("Writing output");
 
     for i in 0..dbg.unitigs.sequence_count(){
         let orientation = orientations[i];
@@ -159,7 +127,102 @@ fn main() {
                 unitig
             }
         };
-        writer.write(&rec);
+
+        seqs_out.write_owned_record(&rec);
+    }    
+}
+
+fn main() {
+
+    let cli = Command::new("unitig-flipper")
+        .about("Orients unitigs heuristically to minimize the number of dummy nodes in the SBWT graph.")
+        .author("Jarno N. Alanko <alanko.jarno@gmail.com>")
+        .arg(Arg::new("input")
+            .help("Input FASTA or FASTQ file, possibly gzipped")
+            .long("input")
+            .short('i')
+            .required(true)
+            .value_parser(clap::value_parser!(PathBuf))
+        )
+        .arg(Arg::new("output")
+            .help("Output FASTA or FASTQ file, possibly gzipped")
+            .long("output")
+            .short('o')
+            .required(true)
+            .value_parser(clap::value_parser!(PathBuf))
+        )
+        .arg(Arg::new("k")
+            .help("k-mer length")
+            .short('k')
+            .required(true)
+            .value_parser(clap::value_parser!(usize))
+        );
+
+    let cli_matches = cli.get_matches();
+    let infile: &PathBuf = cli_matches.get_one("input").unwrap();
+    let outfile: &PathBuf = cli_matches.get_one("output").unwrap();
+    let k: usize = *cli_matches.get_one("k").unwrap();
+
+    let reader = DynamicFastXReader::from_file(infile).unwrap();
+    let mut writer = DynamicFastXWriter::new_to_file(outfile).unwrap();
+
+    eprintln!("Reading and reverse-complementing sequences into memory");
+    let (db, rc_db) = reader.into_db_with_revcomp().unwrap();
+    run(db, rc_db, &mut writer, k);
+
+}
+
+#[cfg(test)]
+mod tests{
+    use super::*;
+    use jseqio::{seq_db::SeqDB, record::OwnedRecord, writer::{FastXWriter}, reverse_complement};
+    use std::io::{BufRead, Read};
+    use std::io::BufReader;
+
+    fn helper_get_seq_dbs<'a>(seqs: impl IntoIterator<Item = &'a [u8]>) -> (SeqDB, SeqDB){
+        let mut fw_db = SeqDB::new(false);
+        let mut rc_db = SeqDB::new(false);
+
+        for seq in seqs{
+            let rc = jseqio::reverse_complement(seq);
+            fw_db.push_record(jseqio::record::RefRecord{head: b"", seq: seq, qual: None});
+            rc_db.push_record(jseqio::record::RefRecord{head: b"", seq: rc.as_slice(), qual: None});
+        }
+
+        (fw_db, rc_db)
     }
 
+    #[test]
+    fn straight_line(){
+        // Input
+        let k = 3;
+        let data = vec![b"TCG", b"ATC", b"ATG", b"ACC", b"CCG"];
+
+        // Two possible answers
+        let ans1 = vec![b"CGA", b"GAT", b"ATG", b"ACC", b"CCG"];
+        let ans2: Vec<Vec<u8>> = ans1.iter().map(|s| reverse_complement(s.as_slice())).collect();
+
+        // Run the test
+
+        let seq_iter = data.iter().map(|s| s.as_slice());
+    
+        let (fw_db, rc_db) = helper_get_seq_dbs(seq_iter);
+
+        let out_buf = Vec::<u8>::new();
+        let mut writer = FastXWriter::new(out_buf, jseqio::FileType::FASTA);
+
+        run(fw_db, rc_db, &mut writer, k);
+        let out_buf = writer.into_inner(); // Get back the out buffer
+
+        let br = BufReader::new(std::io::Cursor::new(out_buf));
+        let reader = DynamicFastXReader::new(br).unwrap();
+        let out_db = reader.into_db().unwrap();
+        assert_eq!(data.len(), out_db.sequence_count());
+
+        let ans1_match = (0..ans1.len()).all(|i| ans1[i] == out_db.get(i).unwrap().seq);
+        let ans2_match = (0..ans2.len()).all(|i| ans2[i] == out_db.get(i).unwrap().seq);
+
+        assert!(ans1_match || ans2_match);
+
+    }
 }
