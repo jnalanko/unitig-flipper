@@ -44,7 +44,7 @@ struct MapValue{
     position: Position,
 }
 
-fn ensure_is_in_map(map: &mut HashMap<Vec<u8>, Vec<MapValue>>, key: &[u8]){
+fn insert_if_not_present(map: &mut HashMap<Vec<u8>, Vec<MapValue>>, key: &[u8]){
     if !map.contains_key(key){
         map.insert(key.to_owned(), Vec::<MapValue>::new());
     }
@@ -59,25 +59,6 @@ fn rc(c: u8) -> u8{
         _ => panic!("Invalid character: {}", c),
     }
 }
-
-/*
-        borders.get(last).unwrap().iter().for_each(|&MapValue{unitig_id, position}|{
-            match position{
-                Position::Start => {
-                    let edge = Edge{
-                        from: i,
-                        to: unitig_id,
-                        from_orientation: Orientation::Forward,
-                        to_orientation: Orientation::Forward,
-                    };
-                    edges[i].push(edge); // Does not work as an edge
-                }
-                Position::End => ()
-            }
-        });
-
-*/
-
 
 fn push_edges(from: usize, from_orientation: Orientation, to_orientation: Orientation, to_position: Position, linking_kmer: &[u8], edges: &mut Vec<Vec<Edge>>, borders: &HashMap<Vec<u8>, Vec<MapValue>>){
     if let Some(vec) = borders.get(linking_kmer){
@@ -103,8 +84,8 @@ fn build_dbg(unitigs: SeqDB, k: usize) -> DBG{
         let first = &unitig.seq[..k-1];
         let last = &unitig.seq[unitig.seq.len()-(k-1)..];
 
-        ensure_is_in_map(&mut borders, first);
-        ensure_is_in_map(&mut borders, last);
+        insert_if_not_present(&mut borders, first);
+        insert_if_not_present(&mut borders, last);
 
         borders.get_mut(first).unwrap().push(
             MapValue{
