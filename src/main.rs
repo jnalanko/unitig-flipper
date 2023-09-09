@@ -7,19 +7,64 @@ use clap::{Command, Arg};
 use dbg::Orientation;
 use dbg::Orientation::{Forward, Reverse};
 
+fn is_terminal(dbg: &dbg::DBG, unitig_id: usize) -> bool{
+    let mut has_fw = false;
+    let mut has_bw = false;
+    for e in dbg.edges[unitig_id].iter(){
+        if e.from == e.to{
+            continue; // Self-loops don't count
+        }
+        has_fw |= e.from_orientation == Forward;
+        has_bw |= e.from_orientation == Reverse;
+    }
+
+    !(has_fw && has_bw)
+}
+
+fn dfs_from(root: usize, dbg: &dbg::DBG, visited: &mut Vec<bool>, orientations: &mut Vec<Orientation>){
+    let mut stack = Vec::<(usize, Orientation)>::new();
+
+    // Arbitrarily orient the root as forward
+    stack.push((root, Orientation::Forward));
+
+    let mut component_size: usize = 0;
+    // DFS from root and orient all reachable unitigs the same way
+    while let Some((unitig_id, orientation)) = stack.pop(){
+        if visited[unitig_id]{
+            continue;
+        }
+
+        component_size += 1;
+        visited[unitig_id] = true;
+        orientations[unitig_id] = orientation;
+
+        for edge in dbg.edges[unitig_id].iter(){
+           match (edge.from_orientation, edge.to_orientation, orientation){
+                // Edge leaves from the forward end of the current unitig
+                (Forward, Forward, _) => stack.push((edge.to, orientation)),
+                (Forward, Reverse, _) => stack.push((edge.to, orientation.flip())),
+                // Edge leaves from the reverse end of the current unitig
+                (Reverse, Forward, _) => stack.push((edge.to, orientation.flip())),
+                (Reverse, Reverse, _) => stack.push((edge.to, orientation)),
+            };
+        }
+    }
+    eprintln!("Component size = {}", component_size);
+}
+
 fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
     let mut orientations = Vec::<Orientation>::new();
     orientations.resize(dbg.unitigs.sequence_count(), Orientation::Forward);
 
     let mut visited = vec![false; dbg.unitigs.sequence_count()];
 
-    let mut stack = Vec::<(usize, Orientation)>::new(); // Reused DFS stack between iterations
+    
     let mut n_components: usize = 0;    
-    for component_root in 0..dbg.unitigs.sequence_count(){
-        let is_source = dbg.edges[component_root].iter().all(|edge| edge.from_orientation == Orientation::Forward);
-        let is_self_loop = dbg.edges[component_root].iter().any(|edge| edge.from == edge.to);
 
-        if !is_source && !is_self_loop {
+    // DFS from terminal nodes
+    for component_root in 0..dbg.unitigs.sequence_count(){
+
+        if !is_terminal(&dbg, component_root) {
             // This node will be visited from some other node
             continue;
         }
@@ -28,32 +73,19 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
             continue;
         }
 
+        dfs_from(component_root, &dbg, &mut visited, &mut orientations);
         n_components += 1;
-        // Arbitrarily orient the root as forward        
-        stack.push((component_root, Orientation::Forward));
+    }
 
-        let mut component_size: usize = 0;
-        // DFS from root and orient all reachable unitigs the same way
-        while let Some((unitig_id, orientation)) = stack.pop(){
-            if visited[unitig_id]{
-                continue;
-            }
+    // Only cycles remain. DFS from the rest.
+    for component_root in 0..dbg.unitigs.sequence_count(){
 
-            component_size += 1;
-            visited[unitig_id] = true;
-            orientations[unitig_id] = orientation;
-    
-            for edge in dbg.edges[unitig_id].iter(){
-               match (edge.from_orientation, edge.to_orientation, orientation){
-                    (Forward, Forward, Forward) => stack.push((edge.to, Forward)),
-                    (Forward, Reverse, Forward) => stack.push((edge.to, Reverse)),
-                    (Reverse, Forward, Reverse) => stack.push((edge.to, Forward)),
-                    (Reverse, Reverse, Reverse) => stack.push((edge.to, Reverse)),
-                    (_, _ ,_) => () // Unsuitable edge
-                };
-            }
+        if visited[component_root]{
+            continue;
         }
-        eprintln!("Component size = {}", component_size);
+
+        dfs_from(component_root, &dbg, &mut visited, &mut orientations);
+        n_components += 1;
     }
 
     eprintln!("Found {} component{}", n_components, match n_components > 1 {true => "s", false => ""});
