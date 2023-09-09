@@ -221,10 +221,6 @@ fn pick_orientations(dbg: &DBG) -> Vec<Orientation>{
             }
         }
         eprintln!("Component size = {}", component_size);
-        if component_size == 1{
-            eprintln!("{}", dbg.unitigs.get(component_root).unwrap());
-            eprintln!("{:?}", dbg.edges[component_root]);
-        }
     }
 
     eprintln!("Found {} component{}", n_components, match n_components > 1 {true => "s", false => ""});
