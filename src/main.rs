@@ -44,9 +44,9 @@ struct MapValue{
     position: Position,
 }
 
-fn insert_if_not_present(map: &mut HashMap<Vec<u8>, Vec<MapValue>>, key: &[u8]){
+fn insert_if_not_present<'key, 'borrow>(map: &'borrow mut HashMap<&'key [u8], Vec<MapValue>>, key: &'key [u8]){
     if !map.contains_key(key){
-        map.insert(key.to_owned(), Vec::<MapValue>::new());
+        map.insert(&key, Vec::<MapValue>::new());
     }
 }
 
@@ -60,7 +60,7 @@ fn rc(c: u8) -> u8{
     }
 }
 
-fn push_edges(from: usize, from_orientation: Orientation, to_orientation: Orientation, to_position: Position, linking_kmer: &[u8], edges: &mut Vec<Vec<Edge>>, borders: &HashMap<Vec<u8>, Vec<MapValue>>){
+fn push_edges(from: usize, from_orientation: Orientation, to_orientation: Orientation, to_position: Position, linking_kmer: &[u8], edges: &mut Vec<Vec<Edge>>, borders: &HashMap<&[u8], Vec<MapValue>>){
     if let Some(vec) = borders.get(linking_kmer){
         for x in vec.iter(){
             if x.position == to_position {
@@ -72,8 +72,8 @@ fn push_edges(from: usize, from_orientation: Orientation, to_orientation: Orient
 }
 
 
-fn build_dbg(unitigs: SeqDB, k: usize) -> DBG{
-    let mut borders: HashMap<Vec<u8>, Vec<MapValue>> = HashMap::new(); // (k-1)-mer to locations of that k-mer
+fn build_dbg(unitigs: SeqDB, unitigs_rc: SeqDB, k: usize) -> DBG{
+    let mut borders: HashMap<&[u8], Vec<MapValue>> = HashMap::new(); // (k-1)-mer to locations of that k-mer
 
     let n = unitigs.sequence_count();
 
@@ -107,12 +107,8 @@ fn build_dbg(unitigs: SeqDB, k: usize) -> DBG{
 
     // Build edges
     for i in 0..n{
-        let unitig = unitigs.get(i).unwrap().to_owned();
-        let unitig_rc = OwnedRecord{
-            head: unitig.head.clone(),
-            seq: unitig.seq.iter().rev().map(|&c| rc(c)).collect(),
-            qual: unitig.qual.clone(),
-        };
+        let unitig = unitigs.get(i).unwrap();
+        let unitig_rc = unitigs_rc.get(i).unwrap();
 
         let first = &unitig.seq[..k-1];
         let last = &unitig.seq[unitig.seq.len()-(k-1)..];
@@ -182,8 +178,8 @@ fn main() {
     let k = std::env::args().nth(2).unwrap().parse::<usize>().unwrap();
     let reader = DynamicFastXReader::from_file(&filename).unwrap();
     let filetype = reader.filetype();
-    let db = reader.into_db().unwrap();
-    let dbg = build_dbg(db, k);
+    let (db, rc_db) = reader.into_db_with_revcomp().unwrap();
+    let dbg = build_dbg(db, rc_db, k);
     let orientations = pick_orientations(&dbg);
 
     // Todo: gzip
