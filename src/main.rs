@@ -5,7 +5,7 @@ use jseqio::writer;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 enum Orientation{
     Forward,
     Reverse,
@@ -20,7 +20,7 @@ impl Orientation {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 enum Position{
     Start,
     End,
@@ -82,7 +82,7 @@ fn rc(c: u8) -> u8{
 fn push_edges(from: usize, from_orientation: Orientation, to_orientation: Orientation, to_position: Position, linking_kmer: &[u8], edges: &mut Vec<Vec<Edge>>, borders: &HashMap<Vec<u8>, Vec<MapValue>>){
     if let Some(vec) = borders.get(linking_kmer){
         for x in vec.iter(){
-            if matches!(x.position, to_position) {
+            if x.position == to_position {
                 let edge = Edge{from, to: x.unitig_id, from_orientation, to_orientation};
                 edges[from].push(edge);
             }
