@@ -67,7 +67,7 @@ pub fn build_dbg(unitigs: SeqDB, unitigs_rc: SeqDB, k: usize) -> DBG{
 
     // Build borders map
     for i in 0..n{
-        let unitig = unitigs.get(i).unwrap();
+        let unitig = unitigs.get(i);
 
         let first = &unitig.seq[..k-1];
         let last = &unitig.seq[unitig.seq.len()-(k-1)..];
@@ -95,8 +95,8 @@ pub fn build_dbg(unitigs: SeqDB, unitigs_rc: SeqDB, k: usize) -> DBG{
 
     // Build edges
     for i in 0..n{
-        let unitig = unitigs.get(i).unwrap();
-        let unitig_rc = unitigs_rc.get(i).unwrap();
+        let unitig = unitigs.get(i);
+        let unitig_rc = unitigs_rc.get(i);
 
         let first = &unitig.seq[..k-1];
         let last = &unitig.seq[unitig.seq.len()-(k-1)..];

@@ -2,14 +2,14 @@ mod dbg;
 
 use std::path::PathBuf;
 
-use jseqio::reader::{DynamicFastXReader, SeqRecordProducer};
+use jseqio::reader::*;
+use jseqio::writer::*;
 use jseqio::record::*;
 use clap::{Command, Arg};
 
 use dbg::Orientation;
 use dbg::Orientation::{Forward, Reverse};
 use jseqio::seq_db::SeqDB;
-use jseqio::writer::{DynamicFastXWriter, SeqRecordWriter};
 
 fn is_terminal(dbg: &dbg::DBG, unitig_id: usize) -> bool{
     let mut has_fw = false;
@@ -120,15 +120,15 @@ fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWr
     for i in 0..dbg.unitigs.sequence_count(){
         let orientation = orientations[i];
         let rec: OwnedRecord = match orientation{
-            Orientation::Forward => dbg.unitigs.get(i).unwrap().to_owned(),
+            Orientation::Forward => dbg.unitigs.get(i).to_owned(),
             Orientation::Reverse => {
-                let mut unitig = dbg.unitigs.get(i).unwrap().to_owned();
+                let mut unitig = dbg.unitigs.get(i).to_owned();
                 unitig.reverse_complement();
                 unitig
             }
         };
 
-        seqs_out.write_owned_record(&rec);
+        seqs_out.write_owned_record(&rec).unwrap();
     }    
 }
 
@@ -175,8 +175,6 @@ fn main() {
 #[cfg(test)]
 mod tests{
     use super::*;
-    use jseqio::{seq_db::SeqDB, record::OwnedRecord, writer::{FastXWriter}, reverse_complement};
-    use std::io::{BufRead, Read};
     use std::io::BufReader;
 
     fn helper_get_seq_dbs<'a>(seqs: impl IntoIterator<Item = &'a [u8]>) -> (SeqDB, SeqDB){
@@ -185,8 +183,8 @@ mod tests{
 
         for seq in seqs{
             let rc = jseqio::reverse_complement(seq);
-            fw_db.push_record(jseqio::record::RefRecord{head: b"", seq: seq, qual: None});
-            rc_db.push_record(jseqio::record::RefRecord{head: b"", seq: rc.as_slice(), qual: None});
+            fw_db.push_record(RefRecord{head: b"", seq: seq, qual: None});
+            rc_db.push_record(RefRecord{head: b"", seq: rc.as_slice(), qual: None});
         }
 
         (fw_db, rc_db)
@@ -200,7 +198,7 @@ mod tests{
 
         // Two possible answers
         let ans1 = vec![b"CGA", b"GAT", b"ATG", b"ACC", b"CCG"];
-        let ans2: Vec<Vec<u8>> = ans1.iter().map(|s| reverse_complement(s.as_slice())).collect();
+        let ans2: Vec<Vec<u8>> = ans1.iter().map(|s| jseqio::reverse_complement(s.as_slice())).collect();
 
         // Run the test
 
@@ -212,15 +210,15 @@ mod tests{
         let mut writer = FastXWriter::new(out_buf, jseqio::FileType::FASTA);
 
         run(fw_db, rc_db, &mut writer, k);
-        let out_buf = writer.into_inner(); // Get back the out buffer
+        let out_buf = writer.into_inner().unwrap(); // Get back the out buffer
 
         let br = BufReader::new(std::io::Cursor::new(out_buf));
         let reader = DynamicFastXReader::new(br).unwrap();
         let out_db = reader.into_db().unwrap();
         assert_eq!(data.len(), out_db.sequence_count());
 
-        let ans1_match = (0..ans1.len()).all(|i| ans1[i] == out_db.get(i).unwrap().seq);
-        let ans2_match = (0..ans2.len()).all(|i| ans2[i] == out_db.get(i).unwrap().seq);
+        let ans1_match = (0..ans1.len()).all(|i| ans1[i] == out_db.get(i).seq);
+        let ans2_match = (0..ans2.len()).all(|i| ans2[i] == out_db.get(i).seq);
 
         assert!(ans1_match || ans2_match);
 
