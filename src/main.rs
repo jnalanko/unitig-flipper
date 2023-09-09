@@ -21,15 +21,15 @@ fn is_terminal(dbg: &dbg::DBG, unitig_id: usize) -> bool{
     !(has_fw && has_bw)
 }
 
-fn dfs_from(root: usize, dbg: &dbg::DBG, visited: &mut Vec<bool>, orientations: &mut Vec<Orientation>){
-    let mut stack = std::collections::VecDeque::<(usize, Orientation)>::new();
+fn bfs_from(root: usize, dbg: &dbg::DBG, visited: &mut Vec<bool>, orientations: &mut Vec<Orientation>){
+    let mut queue = std::collections::VecDeque::<(usize, Orientation)>::new();
 
     // Arbitrarily orient the root as forward
-    stack.push_back((root, Orientation::Forward));
+    queue.push_back((root, Orientation::Forward));
 
     let mut component_size: usize = 0;
-    // DFS from root and orient all reachable unitigs the same way
-    while let Some((unitig_id, orientation)) = stack.pop_front(){
+    // BFS from root and orient all reachable unitigs the same way
+    while let Some((unitig_id, orientation)) = queue.pop_front(){
         if visited[unitig_id]{
             continue;
         }
@@ -47,11 +47,11 @@ fn dfs_from(root: usize, dbg: &dbg::DBG, visited: &mut Vec<bool>, orientations: 
 
             match (edge.from_orientation, edge.to_orientation, orientation){
                  // Edge leaves from the forward end of the current unitig
-                 (Forward, Forward, _) => stack.push_back((edge.to, orientation)),
-                 (Forward, Reverse, _) => stack.push_back((edge.to, orientation.flip())),
+                 (Forward, Forward, _) => queue.push_back((edge.to, orientation)),
+                 (Forward, Reverse, _) => queue.push_back((edge.to, orientation.flip())),
                  // Edge leaves from the reverse end of the current unitig
-                 (Reverse, Forward, _) => stack.push_back((edge.to, orientation.flip())),
-                 (Reverse, Reverse, _) => stack.push_back((edge.to, orientation)),
+                 (Reverse, Forward, _) => queue.push_back((edge.to, orientation.flip())),
+                 (Reverse, Reverse, _) => queue.push_back((edge.to, orientation)),
              };
         }
     }
@@ -79,7 +79,7 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
             continue;
         }
 
-        dfs_from(component_root, &dbg, &mut visited, &mut orientations);
+        bfs_from(component_root, &dbg, &mut visited, &mut orientations);
         n_components += 1;
     }
 
@@ -93,7 +93,7 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
             continue;
         }
 
-        dfs_from(component_root, &dbg, &mut visited, &mut orientations);
+        bfs_from(component_root, &dbg, &mut visited, &mut orientations);
         n_components += 1;
     }
 
