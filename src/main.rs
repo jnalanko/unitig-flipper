@@ -88,7 +88,7 @@ fn main() {
     // Let's also open the writer right away so it errors out if the file cannot be opened
     let mut writer = jseqio::writer::DynamicFastXWriter::new_to_file(outfile).unwrap();
 
-    eprintln!("Reading sequences into memory");
+    eprintln!("Reading and reverse-complementing sequences from {} into memory", infile.display());
     let (db, rc_db) = reader.into_db_with_revcomp().unwrap();
 
     eprintln!("Building bidirected DBG edges");
@@ -97,7 +97,7 @@ fn main() {
     eprintln!("Choosing unitig orientations");
     let orientations = pick_orientations(&dbg);
 
-    eprintln!("Writing output to stdout");
+    eprintln!("Writing output to {}", outfile.display());
 
     for i in 0..dbg.unitigs.sequence_count(){
         let orientation = orientations[i];
