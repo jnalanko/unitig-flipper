@@ -1,6 +1,6 @@
 use jseqio::seq_db::SeqDB;
 use jseqio::reader::DynamicFastXReader;
-use jseqio::record::{OwnedRecord, RefRecord};
+use jseqio::record::*;
 use jseqio::writer;
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -69,7 +69,7 @@ fn build_dbg(unitigs: SeqDB, k: usize) -> DBG{
     for i in 0..n{
         let unitig = unitigs.get(i).unwrap();
 
-        let first = &unitig.seq[0..k-1];
+        let first = &unitig.seq[..k-1];
         let last = &unitig.seq[unitig.seq.len()-(k-1)..];
 
         ensure_is_in_map(&mut borders, first);
@@ -102,11 +102,11 @@ fn build_dbg(unitigs: SeqDB, k: usize) -> DBG{
             qual: unitig.qual.clone(),
         };
 
-        let first = &unitig.seq[0..k-1];
+        let first = &unitig.seq[..k-1];
         let last = &unitig.seq[unitig.seq.len()-(k-1)..];
 
-        let first_rc = &unitig_rc.seq[0..k-1];
-        let last_rc = &unitig_rc.seq[unitig_rc.seq.len()-(k-1)..];
+        let first_rc = &unitig_rc.seq[unitig_rc.seq.len()-(k-1)..];
+        let last_rc = &unitig_rc.seq[..k-1];
 
         // Forward -> Forward edges
         borders.get(last).unwrap().iter().for_each(|&MapValue{unitig_id, position}|{
@@ -199,12 +199,14 @@ fn pick_orientations(dbg: &DBG) -> Vec<Orientation>{
         // Arbitrarily orient the root as forward        
         stack.push((component_root, Orientation::Forward));
 
+        let mut component_size: usize = 0;
         // DFS from root and orient all reachable unitigs the same way
         while let Some((unitig_id, orientation)) = stack.pop(){
             if visited[unitig_id]{
                 continue;
             }
 
+            component_size += 1;
             visited[unitig_id] = true;
             orientations[unitig_id] = orientation;
     
@@ -217,6 +219,11 @@ fn pick_orientations(dbg: &DBG) -> Vec<Orientation>{
                 };
                 stack.push((edge.to, next_orientation));
             }
+        }
+        eprintln!("Component size = {}", component_size);
+        if component_size == 1{
+            eprintln!("{}", dbg.unitigs.get(component_root).unwrap());
+            eprintln!("{:?}", dbg.edges[component_root]);
         }
     }
 
