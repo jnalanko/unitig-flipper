@@ -84,7 +84,7 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
     }
 
     let n_visited = visited.iter().fold(0_usize, |sum, &x| sum + x as usize);
-    eprintln!("{:.2}% of unitigs visited so far... proceeding to clean up cycles", 100.0 * n_visited as f64 / dbg.unitigs.sequence_count() as f64);
+    eprintln!("{:.2}% of unitigs visited so far... proceeding to clean up the rest", 100.0 * n_visited as f64 / dbg.unitigs.sequence_count() as f64);
 
     // Only cycles remain. DFS from the rest.
     for component_root in 0..dbg.unitigs.sequence_count(){
