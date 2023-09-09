@@ -17,7 +17,7 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
     let mut n_components: usize = 0;    
     for component_root in 0..dbg.unitigs.sequence_count(){
         let is_source = dbg.edges[component_root].iter().all(|edge| edge.from_orientation == Orientation::Forward);
-        let is_self_loop = dbg.edges[component_root].iter().all(|edge| edge.from == edge.to);
+        let is_self_loop = dbg.edges[component_root].iter().any(|edge| edge.from == edge.to);
 
         if !is_source && !is_self_loop {
             // This node will be visited from some other node
