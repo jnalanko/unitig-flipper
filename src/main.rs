@@ -67,7 +67,7 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
     
     let mut n_components: usize = 0;    
 
-    // DFS from terminal nodes
+    // BFS from terminal nodes
     for component_root in 0..dbg.unitigs.sequence_count(){
 
         if !is_terminal(&dbg, component_root) {
@@ -86,7 +86,7 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
     let n_visited = visited.iter().fold(0_usize, |sum, &x| sum + x as usize);
     eprintln!("{:.2}% of unitigs visited so far... proceeding to clean up the rest", 100.0 * n_visited as f64 / dbg.unitigs.sequence_count() as f64);
 
-    // Only cycles remain. DFS from the rest.
+    // BFS from the rest.
     for component_root in 0..dbg.unitigs.sequence_count(){
 
         if visited[component_root]{
