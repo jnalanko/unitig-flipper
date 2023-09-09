@@ -39,14 +39,20 @@ fn dfs_from(root: usize, dbg: &dbg::DBG, visited: &mut Vec<bool>, orientations: 
         orientations[unitig_id] = orientation;
 
         for edge in dbg.edges[unitig_id].iter(){
-           match (edge.from_orientation, edge.to_orientation, orientation){
-                // Edge leaves from the forward end of the current unitig
-                (Forward, Forward, _) => stack.push((edge.to, orientation)),
-                (Forward, Reverse, _) => stack.push((edge.to, orientation.flip())),
-                // Edge leaves from the reverse end of the current unitig
-                (Reverse, Forward, _) => stack.push((edge.to, orientation.flip())),
-                (Reverse, Reverse, _) => stack.push((edge.to, orientation)),
-            };
+            if edge.from_orientation != orientation{
+                // If we came to this node in the forward orientation, we may only
+                // leave on edges that leave in the forward orientation. And vice versa.
+                continue;
+            }
+
+            match (edge.from_orientation, edge.to_orientation, orientation){
+                 // Edge leaves from the forward end of the current unitig
+                 (Forward, Forward, _) => stack.push((edge.to, orientation)),
+                 (Forward, Reverse, _) => stack.push((edge.to, orientation.flip())),
+                 // Edge leaves from the reverse end of the current unitig
+                 (Reverse, Forward, _) => stack.push((edge.to, orientation.flip())),
+                 (Reverse, Reverse, _) => stack.push((edge.to, orientation)),
+             };
         }
     }
     eprintln!("Component size = {}", component_size);
