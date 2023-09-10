@@ -1,4 +1,6 @@
 use jseqio::seq_db::SeqDB;
+use rayon::prelude::{IntoParallelIterator, IntoParallelRefMutIterator, IndexedParallelIterator};
+use rayon::iter::ParallelIterator;
 use std::collections::HashMap;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -54,12 +56,12 @@ pub struct DBG{
     pub edges: Vec<Vec<Edge>> // edges[i] = outgoing edges from unitig i
 }
 
-fn push_edges(from: usize, from_orientation: Orientation, to_orientation: Orientation, to_position: Position, linking_kmer: &[u8], edges: &mut Vec<Vec<Edge>>, borders: &HashMap<&[u8], Vec<MapValue>>){
+fn push_edges(from: usize, from_orientation: Orientation, to_orientation: Orientation, to_position: Position, linking_kmer: &[u8], edges: &mut Vec<Edge>, borders: &HashMap<&[u8], Vec<MapValue>>){
     if let Some(vec) = borders.get(linking_kmer){
         for x in vec.iter(){
             if x.position == to_position {
                 let edge = Edge{from, to: x.unitig_id, from_orientation, to_orientation};
-                edges[from].push(edge);
+                edges.push(edge);
             }
         }
     }
@@ -99,7 +101,7 @@ pub fn build_dbg(unitigs: SeqDB, unitigs_rc: SeqDB, k: usize) -> DBG{
     edges.resize_with(n, || Vec::<Edge>::new()); // Allocate n edge lists
 
     // Build edges
-    for i in 0..n{
+    edges.par_iter_mut().enumerate().for_each(|(i, edges)|{
         let unitig = unitigs.get(i);
         let unitig_rc = unitigs_rc.get(i);
 
@@ -110,12 +112,11 @@ pub fn build_dbg(unitigs: SeqDB, unitigs_rc: SeqDB, k: usize) -> DBG{
         let last_rc = &unitig_rc.seq[..k-1];
 
 
-        push_edges(i, Orientation::Forward, Orientation::Forward, Position::Start, last, &mut edges, &borders);
-        push_edges(i, Orientation::Forward, Orientation::Reverse, Position::End, last_rc, &mut edges, &borders);
-        push_edges(i, Orientation::Reverse, Orientation::Reverse, Position::End, first, &mut edges, &borders);
-        push_edges(i, Orientation::Reverse, Orientation::Forward, Position::Start, first_rc, &mut edges, &borders);
-
-    }
+        push_edges(i, Orientation::Forward, Orientation::Forward, Position::Start, last, edges, &borders);
+        push_edges(i, Orientation::Forward, Orientation::Reverse, Position::End, last_rc, edges, &borders);
+        push_edges(i, Orientation::Reverse, Orientation::Reverse, Position::End, first, edges, &borders);
+        push_edges(i, Orientation::Reverse, Orientation::Forward, Position::Start, first_rc, edges, &borders);
+    });
 
     DBG {unitigs, edges}
 }
