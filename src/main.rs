@@ -206,8 +206,8 @@ mod tests{
     use std::io::BufReader;
 
     fn helper_get_seq_dbs<'a>(seqs: impl IntoIterator<Item = &'a [u8]>) -> (SeqDB, SeqDB){
-        let mut fw_db = SeqDB::new(false);
-        let mut rc_db = SeqDB::new(false);
+        let mut fw_db = SeqDB::new();
+        let mut rc_db = SeqDB::new();
 
         for seq in seqs{
             let rc = jseqio::reverse_complement(seq);
