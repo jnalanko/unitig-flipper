@@ -114,7 +114,7 @@ fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWr
     eprintln!("Evaluating the solution");
     let n_with_predecessor = evaluate(&orientations, &dbg);
 
-    eprintln!("{} unitigs have a predecessor ({:.2}%)", n_with_predecessor, 100.0 * n_with_predecessor as f64 / dbg.unitigs.sequence_count() as f64);
+    eprintln!("{}/{} unitigs have a predecessor ({:.2}%)", n_with_predecessor, dbg.unitigs.sequence_count(), 100.0 * n_with_predecessor as f64 / dbg.unitigs.sequence_count() as f64);
 
     eprintln!("Writing output");
 
