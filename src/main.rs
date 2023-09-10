@@ -7,6 +7,8 @@ use jseqio::writer::*;
 use jseqio::record::*;
 use clap::{Command, Arg};
 
+use log::info;
+
 use dbg::Orientation;
 use dbg::Orientation::{Forward, Reverse};
 use jseqio::seq_db::SeqDB;
@@ -85,7 +87,7 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
     }
 
     let n_visited = visited.iter().fold(0_usize, |sum, &x| sum + x as usize);
-    eprintln!("{:.2}% of unitigs visited so far... proceeding to clean up the rest", 100.0 * n_visited as f64 / dbg.unitigs.sequence_count() as f64);
+    info!("{:.2}% of unitigs visited so far... proceeding to clean up the rest", 100.0 * n_visited as f64 / dbg.unitigs.sequence_count() as f64);
 
     // BFS from the rest.
     for component_root in 0..dbg.unitigs.sequence_count(){
@@ -98,25 +100,25 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
         n_components += 1;
     }
 
-    eprintln!("Done. Total {} BFS iterations executed", n_components);
+    info!("Done. Total {} BFS iterations executed", n_components);
 
     orientations
 }
 
 fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWriter, k: usize){
 
-    eprintln!("Building bidirected DBG edges");
+    info!("Building bidirected DBG edges");
     let dbg = dbg::build_dbg(forward_seqs, reverse_seqs, k);
 
-    eprintln!("Choosing unitig orientations");
+    info!("Choosing unitig orientations");
     let orientations = pick_orientations(&dbg);
 
-    eprintln!("Evaluating the solution");
+    info!("Evaluating the solution");
     let n_with_predecessor = evaluate(&orientations, &dbg);
 
-    eprintln!("{}/{} unitigs have a predecessor ({:.2}%)", n_with_predecessor, dbg.unitigs.sequence_count(), 100.0 * n_with_predecessor as f64 / dbg.unitigs.sequence_count() as f64);
+    info!("{}/{} unitigs have a predecessor ({:.2}%)", n_with_predecessor, dbg.unitigs.sequence_count(), 100.0 * n_with_predecessor as f64 / dbg.unitigs.sequence_count() as f64);
 
-    eprintln!("Writing output");
+    info!("Writing output");
 
     for i in 0..dbg.unitigs.sequence_count(){
         let orientation = orientations[i];
@@ -154,6 +156,12 @@ fn evaluate(choices: &Vec<Orientation>, dbg: &dbg::DBG) -> usize{
 
 fn main() {
 
+    if std::env::var("RUST_LOG").is_err(){
+        std::env::set_var("RUST_LOG", "info");
+    }
+
+    env_logger::init();
+
     let cli = Command::new("unitig-flipper")
         .about("Orients unitigs heuristically to minimize the number of dummy nodes in the SBWT graph.")
         .author("Jarno N. Alanko <alanko.jarno@gmail.com>")
@@ -186,7 +194,7 @@ fn main() {
     let reader = DynamicFastXReader::from_file(infile).unwrap();
     let mut writer = DynamicFastXWriter::new_to_file(outfile).unwrap();
 
-    eprintln!("Reading and reverse-complementing sequences into memory");
+    info!("Reading and reverse-complementing sequences into memory");
     let (db, rc_db) = reader.into_db_with_revcomp().unwrap();
     run(db, rc_db, &mut writer, k);
 
