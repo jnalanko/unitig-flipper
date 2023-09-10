@@ -100,14 +100,14 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
         n_components += 1;
     }
 
-    info!("Done. Total {} BFS iterations executed", n_components);
+    info!("Done. Total {} BFS rounds executed", n_components);
 
     orientations
 }
 
 fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWriter, k: usize){
 
-    info!("Building bidirected DBG edges");
+    info!("Building bidirected DBG edges...");
     let dbg = dbg::build_dbg(forward_seqs, reverse_seqs, k);
 
     info!("Choosing unitig orientations");

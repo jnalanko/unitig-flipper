@@ -70,6 +70,8 @@ pub fn build_dbg(unitigs: SeqDB, unitigs_rc: SeqDB, k: usize) -> DBG{
 
     let n = unitigs.sequence_count();
 
+    log::info!("Hashing border k-mers");
+
     // Build borders map
     for i in 0..n{
         let unitig = unitigs.get(i);
@@ -95,6 +97,7 @@ pub fn build_dbg(unitigs: SeqDB, unitigs_rc: SeqDB, k: usize) -> DBG{
         );
     }
 
+    log::info!("Finding overlaps");
     let mut edges = Vec::<Vec::<Edge>>::new();
     edges.resize_with(n, || Vec::<Edge>::new()); // Allocate n edge lists
 
