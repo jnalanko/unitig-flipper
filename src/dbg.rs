@@ -30,6 +30,11 @@ impl Orientation {
 }
 
 
+// Edge from 'from' to 'to' with given orientations means that
+// with those orientations, the last k-1 bases of 'from' are the 
+// same as the first k-1 bases of 'to'.
+// This means that if (u, v, u_o, v_o) is a valid edge, then
+// (v, u, flip u_o, flip v_o) is also an edge.
 #[derive(Copy, Clone, Debug)]
 pub struct Edge{
     pub from: usize,

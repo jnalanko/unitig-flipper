@@ -31,14 +31,12 @@ fn bfs_from(root: usize, dbg: &dbg::DBG, visited: &mut Vec<bool>, orientations: 
     // Arbitrarily orient the root as forward
     queue.push_back((root, Orientation::Forward));
 
-    let mut component_size: usize = 0;
     // BFS from root and orient all reachable unitigs the same way
     while let Some((unitig_id, orientation)) = queue.pop_front(){
         if visited[unitig_id]{
             continue;
         }
 
-        component_size += 1;
         visited[unitig_id] = true;
         orientations[unitig_id] = orientation;
 
@@ -59,7 +57,6 @@ fn bfs_from(root: usize, dbg: &dbg::DBG, visited: &mut Vec<bool>, orientations: 
              };
         }
     }
-    eprintln!("Component size = {}", component_size);
 }
 
 fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
@@ -101,7 +98,7 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
         n_components += 1;
     }
 
-    eprintln!("Done. Total {} DFS iterations executed", n_components);
+    eprintln!("Done. Total {} BFS iterations executed", n_components);
 
     orientations
 }
@@ -113,6 +110,11 @@ fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWr
 
     eprintln!("Choosing unitig orientations");
     let orientations = pick_orientations(&dbg);
+
+    eprintln!("Evaluating the solution");
+    let n_with_predecessor = evaluate(&orientations, &dbg);
+
+    eprintln!("{} unitigs have a predecessor ({:.2}%)", n_with_predecessor, 100.0 * n_with_predecessor as f64 / dbg.unitigs.sequence_count() as f64);
 
     eprintln!("Writing output");
 
@@ -130,6 +132,25 @@ fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWr
         seqs_out.write_owned_record(&rec).unwrap();
     }    
 }
+
+
+// Returns the number of unitigs that do not have a predecessor
+fn evaluate(choices: &Vec<Orientation>, dbg: &dbg::DBG) -> usize{
+    let mut has_pred = vec![false; dbg.unitigs.sequence_count()];
+
+    for v in 0..dbg.unitigs.sequence_count(){
+        for edge in dbg.edges[v].iter(){
+            let u = edge.to;
+            if choices[v] == edge.from_orientation && choices[u] == edge.to_orientation{
+                has_pred[u] = true;
+            }
+        }
+    }
+    
+    // Return the number of 1-bit in has_pred
+    has_pred.iter().fold(0_usize, |sum, &x| sum + x as usize)
+}
+
 
 fn main() {
 
