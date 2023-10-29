@@ -27,11 +27,26 @@ fn is_terminal(dbg: &dbg::DBG, unitig_id: usize) -> bool{
     !(has_fw && has_bw)
 }
 
-fn bfs_from(root: usize, dbg: &dbg::DBG, visited: &mut Vec<bool>, orientations: &mut Vec<Orientation>){
+fn is_source(dbg: &dbg::DBG, unitig_id: usize) -> bool{
+    let mut has_fw = false;
+    let mut has_bw = false;
+    for e in dbg.edges[unitig_id].iter(){
+        if e.from == e.to{
+            continue; // Self-loops don't count
+        }
+        has_fw |= e.from_orientation == Forward;
+        has_bw |= e.from_orientation == Reverse;
+    }
+
+    has_fw && !has_bw
+}
+
+
+fn bfs_from(root: usize, root_orientation: Orientation, dbg: &dbg::DBG, visited: &mut Vec<bool>, orientations: &mut Vec<Orientation>){
     let mut queue = std::collections::VecDeque::<(usize, Orientation)>::new();
 
-    // Arbitrarily orient the root as forward
-    queue.push_back((root, Orientation::Forward));
+    // Arbitrarily orient the root
+    queue.push_back((root, root_orientation));
 
     // BFS from root and orient all reachable unitigs the same way
     while let Some((unitig_id, orientation)) = queue.pop_front(){
@@ -73,8 +88,7 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
     // BFS from terminal nodes
     for component_root in 0..dbg.unitigs.sequence_count(){
 
-        if !is_terminal(&dbg, component_root) {
-            // This node will be visited from some other node
+        if !is_terminal(&dbg, component_root){
             continue;
         }
 
@@ -82,7 +96,12 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
             continue;
         }
 
-        bfs_from(component_root, &dbg, &mut visited, &mut orientations);
+        let orientation = match is_source(&dbg, component_root){
+            true => Reverse, // Sources are oriented in reverse so that they have a predecessor
+            false => Forward, 
+        };
+
+        bfs_from(component_root, orientation, &dbg, &mut visited, &mut orientations);
         n_components += 1;
     }
 
@@ -96,7 +115,7 @@ fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
             continue;
         }
 
-        bfs_from(component_root, &dbg, &mut visited, &mut orientations);
+        bfs_from(component_root, Forward, &dbg, &mut visited, &mut orientations);
         n_components += 1;
     }
 
