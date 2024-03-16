@@ -137,3 +137,102 @@ fn bfs_from(root: usize, root_orientation: Orientation, dbg: &dbg::DBG, visited:
         }
     }
 }
+
+// Returns the number of unitigs that do not have a predecessor
+pub fn evaluate(choices: &[Orientation], dbg: &dbg::DBG) -> usize{
+    let mut has_pred = vec![false; dbg.unitigs.sequence_count()];
+
+    for v in 0..dbg.unitigs.sequence_count(){
+        for edge in dbg.edges[v].iter(){
+            let u = edge.to;
+            if choices[v] == edge.from_orientation && choices[u] == edge.to_orientation{
+                has_pred[u] = true;
+            }
+        }
+    }
+    
+    // Return the number of 1-bit in has_pred
+    has_pred.iter().fold(0_usize, |sum, &x| sum + x as usize)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::{RngCore, SeedableRng};
+    use rand::rngs::StdRng;
+    
+    fn generate_random_dna_string(length: usize, seed: u64) -> Vec<u8> {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let alphabet: Vec<u8> = vec![b'A', b'C', b'G', b'T'];
+    
+        let mut s = Vec::<u8>::new();
+        for _ in 0..length{
+            s.push(alphabet[(rng.next_u64() % 4) as usize]);
+        }
+        s
+    }
+
+    fn change(c: u8) -> u8 {
+        match c {
+            b'A' => b'C',
+            b'C' => b'G',
+            b'G' => b'T',
+            b'T' => b'A',
+            _ => panic!(),
+        }
+    }
+    
+
+    #[test]
+    fn test_new_algorithm(){
+        // Make a graph like this
+        // o--\          /--o 
+        //     >--------< 
+        // o--/          \--o
+
+        let seed = 123;
+        let S = generate_random_dna_string(100, seed);
+        let k = 10;
+
+        let s1 = &S[20..30];
+
+        let mut s2 = s1.to_owned();
+        s2[0] = change(s2[0]);
+
+        let s_middle = &S[21..50];
+
+        let s3 = &S[41..51];
+        let mut s4 = s3.to_owned();
+        s4[9] = change(s4[9]);
+
+        println!("{}", String::from_utf8_lossy(&s1));
+        println!("{}", String::from_utf8_lossy(&s2));
+        println!("{}", String::from_utf8_lossy(&s_middle));
+        println!("{}", String::from_utf8_lossy(&s3));
+        println!("{}", String::from_utf8_lossy(&s4));
+
+        let seqs = [s1,&s2,s_middle,s3,&s4];
+        let rc_seqs = seqs.iter().map(|s| jseqio::reverse_complement(s));
+
+        let mut db = jseqio::seq_db::SeqDB::new();
+        for seq in seqs {
+            db.push_seq(seq);
+        }
+
+        let mut rc_db = jseqio::seq_db::SeqDB::new();
+        for rc_seq in rc_seqs {
+            rc_db.push_seq(&rc_seq);
+        }
+
+        let dbg = crate::dbg::build_dbg(db, rc_db, k);
+
+        let orientations = new_algorithm(&dbg);
+        for ori in orientations.iter() {
+            dbg!(&ori);
+        }
+
+        let n_sources = evaluate(&orientations, &dbg);
+        dbg!(n_sources);
+
+    }    
+}

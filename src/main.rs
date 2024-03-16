@@ -7,7 +7,7 @@ use clap::{Command, Arg};
 
 use log::info;
 
-use unitig_flipper::{pick_orientations, new_algorithm};
+use unitig_flipper::{pick_orientations, new_algorithm, evaluate};
 use unitig_flipper::dbg;
 use unitig_flipper::dbg::Orientation;
 use jseqio::seq_db::SeqDB;
@@ -50,25 +50,6 @@ fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWr
         seqs_out.write_owned_record(&rec).unwrap();
     }    
 }
-
-
-// Returns the number of unitigs that do not have a predecessor
-fn evaluate(choices: &[Orientation], dbg: &dbg::DBG) -> usize{
-    let mut has_pred = vec![false; dbg.unitigs.sequence_count()];
-
-    for v in 0..dbg.unitigs.sequence_count(){
-        for edge in dbg.edges[v].iter(){
-            let u = edge.to;
-            if choices[v] == edge.from_orientation && choices[u] == edge.to_orientation{
-                has_pred[u] = true;
-            }
-        }
-    }
-    
-    // Return the number of 1-bit in has_pred
-    has_pred.iter().fold(0_usize, |sum, &x| sum + x as usize)
-}
-
 
 fn main() {
 
