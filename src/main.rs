@@ -10,9 +10,14 @@ use log::info;
 use unitig_flipper::{pick_orientations, new_algorithm, evaluate};
 use unitig_flipper::dbg;
 use unitig_flipper::dbg::Orientation;
+use unitig_flipper::dbg_rethink;
 use jseqio::seq_db::SeqDB;
 
 fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWriter, k: usize){
+
+    let n_seqs = forward_seqs.sequence_count();
+
+    /*
 
     info!("Building bidirected DBG edges...");
     let dbg = dbg::build_dbg(forward_seqs, reverse_seqs, k);
@@ -32,6 +37,18 @@ fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWr
     let n_with_predecessor = evaluate(&orientations, &dbg);
 
     info!("{}/{} unitigs have a predecessor ({:.2}%)", n_with_predecessor, dbg.unitigs.sequence_count(), 100.0 * n_with_predecessor as f64 / dbg.unitigs.sequence_count() as f64);
+    */
+
+    info!("Running rethink");
+    let dbg_new = dbg_rethink::DBG::build(forward_seqs, reverse_seqs, k);
+    let orientations = dbg_rethink::pick_orientations_rethink(&dbg_new);
+
+    info!("Evaluating the solution");
+    let n_with_predecessor = dbg_rethink::evaluate(&orientations, &dbg_new);
+
+    info!("{}/{} unitigs have a predecessor ({:.2}%)", n_with_predecessor, n_seqs, 100.0 * n_with_predecessor as f64 / n_seqs as f64);
+
+    /*
 
     info!("Writing output");
 
@@ -49,6 +66,7 @@ fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWr
 
         seqs_out.write_owned_record(&rec).unwrap();
     }    
+    */
 }
 
 fn main() {
