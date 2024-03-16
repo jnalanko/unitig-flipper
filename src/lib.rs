@@ -194,14 +194,15 @@ mod tests {
         let S = generate_random_dna_string(100, seed);
         let k = 10;
 
-        let s1 = &S[20..30];
+        let s1 = S[20..30].to_vec();
 
         let mut s2 = s1.to_owned();
         s2[0] = change(s2[0]);
 
-        let s_middle = &S[21..50];
+        let mut s_middle = S[21..50].to_owned();
+        jseqio::reverse_complement_in_place(&mut s_middle);
 
-        let s3 = &S[41..51];
+        let s3 = S[41..51].to_vec();
         let mut s4 = s3.to_owned();
         s4[9] = change(s4[9]);
 
@@ -211,28 +212,42 @@ mod tests {
         println!("{}", String::from_utf8_lossy(&s3));
         println!("{}", String::from_utf8_lossy(&s4));
 
-        let seqs = [s1,&s2,s_middle,s3,&s4];
-        let rc_seqs = seqs.iter().map(|s| jseqio::reverse_complement(s));
+        let original_seqs = vec![s1,s2,s_middle,s3,s4];
 
-        let mut db = jseqio::seq_db::SeqDB::new();
-        for seq in seqs {
-            db.push_seq(seq);
+        // Should get the same number of source nodes no matter the initial orientations
+        for subset_mask in 0..2_u64.pow(original_seqs.len() as u32) {
+            let mut seqs = original_seqs.clone();
+            for i in 0..original_seqs.len() {
+                if ((subset_mask >> i) & 1) > 0 {
+                    jseqio::reverse_complement_in_place(&mut seqs[i]);
+                }
+            }
+
+            let rc_seqs = seqs.iter().map(|s| jseqio::reverse_complement(s));
+
+            let mut db = jseqio::seq_db::SeqDB::new();
+            for seq in seqs.iter() {
+                db.push_seq(seq);
+            }
+
+            let mut rc_db = jseqio::seq_db::SeqDB::new();
+            for rc_seq in rc_seqs {
+                rc_db.push_seq(&rc_seq);
+            }
+
+            let dbg = crate::dbg::build_dbg(db, rc_db, k);
+
+            let orientations = new_algorithm(&dbg);
+            for ori in orientations.iter() {
+                dbg!(&ori);
+            }
+
+            let n_sources = evaluate(&orientations, &dbg);
+            dbg!(n_sources);
+
+            assert_eq!(n_sources, 2);
         }
-
-        let mut rc_db = jseqio::seq_db::SeqDB::new();
-        for rc_seq in rc_seqs {
-            rc_db.push_seq(&rc_seq);
-        }
-
-        let dbg = crate::dbg::build_dbg(db, rc_db, k);
-
-        let orientations = new_algorithm(&dbg);
-        for ori in orientations.iter() {
-            dbg!(&ori);
-        }
-
-        let n_sources = evaluate(&orientations, &dbg);
-        dbg!(n_sources);
+        
 
     }    
 }
