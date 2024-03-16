@@ -1,4 +1,5 @@
 pub mod dbg;
+mod dbg_rethink;
 
 use log::info;
 use dbg::Orientation;
@@ -120,20 +121,13 @@ fn bfs_from(root: usize, root_orientation: Orientation, dbg: &dbg::DBG, visited:
         orientations[unitig_id] = orientation;
 
         for edge in dbg.edges[unitig_id].iter(){
-            if edge.from_orientation != orientation{
+            if edge.from_orientation != orientation {
                 // If we came to this node in the forward orientation, we may only
                 // leave on edges that leave in the forward orientation. And vice versa.
                 continue;
             }
 
-            match (edge.from_orientation, edge.to_orientation, orientation){
-                 // Edge leaves from the forward end of the current unitig
-                 (Forward, Forward, _) => queue.push_back((edge.to, orientation)),
-                 (Forward, Reverse, _) => queue.push_back((edge.to, orientation.flip())),
-                 // Edge leaves from the reverse end of the current unitig
-                 (Reverse, Forward, _) => queue.push_back((edge.to, orientation.flip())),
-                 (Reverse, Reverse, _) => queue.push_back((edge.to, orientation)),
-             };
+            queue.push_back((edge.to, edge.to_orientation));
         }
     }
 }
@@ -199,8 +193,8 @@ mod tests {
         let mut s2 = s1.to_owned();
         s2[0] = change(s2[0]);
 
-        let mut s_middle = S[21..50].to_owned();
-        jseqio::reverse_complement_in_place(&mut s_middle);
+        let mut s_middle = S[21..31].to_owned();
+        let mut s_middle2 = S[22..50].to_owned();
 
         let s3 = S[41..51].to_vec();
         let mut s4 = s3.to_owned();
@@ -209,10 +203,11 @@ mod tests {
         println!("{}", String::from_utf8_lossy(&s1));
         println!("{}", String::from_utf8_lossy(&s2));
         println!("{}", String::from_utf8_lossy(&s_middle));
+        println!("{}", String::from_utf8_lossy(&s_middle2));
         println!("{}", String::from_utf8_lossy(&s3));
         println!("{}", String::from_utf8_lossy(&s4));
 
-        let original_seqs = vec![s1,s2,s_middle,s3,s4];
+        let original_seqs = vec![s1,s2,s_middle,s_middle2,s3,s4];
 
         // Should get the same number of source nodes no matter the initial orientations
         for subset_mask in 0..2_u64.pow(original_seqs.len() as u32) {
@@ -236,6 +231,7 @@ mod tests {
             }
 
             let dbg = crate::dbg::build_dbg(db, rc_db, k);
+            dbg!(&dbg.edges);
 
             let orientations = new_algorithm(&dbg);
             for ori in orientations.iter() {
