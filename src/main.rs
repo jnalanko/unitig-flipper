@@ -49,7 +49,7 @@ fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWr
     info!("{}/{} unitigs have a predecessor ({:.2}%)", n_with_predecessor, n_seqs, 100.0 * n_with_predecessor as f64 / n_seqs as f64);
 
     let n_forward = orientations.iter().fold(0_usize, |acc, &x| (acc + (x == Orientation::Forward) as usize));
-    info!("{}% Forward", n_forward as f64 / n_seqs as f64);
+    info!("{}% Forward", 100.0 * n_forward as f64 / n_seqs as f64);
 
     /*
 
