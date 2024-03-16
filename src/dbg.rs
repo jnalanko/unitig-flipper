@@ -51,7 +51,7 @@ fn insert_if_not_present<'key>(map: &mut HashMap<&'key [u8], Vec<MapValue>>, key
 
 pub struct DBG{
     pub unitigs: SeqDB, // A sequence database with random access to the i-th unitig
-    pub edges: Vec<Vec<Edge>> // edges[i] = outgoing edges from unitig i
+    pub edges: Vec<Vec<Edge>> // edges[i] = edges where unitig i is the "from"-unitig?
 }
 
 fn push_edges(from: usize, from_orientation: Orientation, to_orientation: Orientation, to_position: Position, linking_kmer: &[u8], edges: &mut [Vec<Edge>], borders: &HashMap<&[u8], Vec<MapValue>>){

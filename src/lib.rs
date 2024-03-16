@@ -4,6 +4,32 @@ use log::info;
 use dbg::Orientation;
 use dbg::Orientation::{Forward, Reverse};
 
+pub fn new_algorithm(dbg: &dbg::DBG) -> Vec<Orientation> {
+    let terminal_nodes = (0..dbg.unitigs.sequence_count()).filter(|&v| is_terminal(dbg, v));
+
+    let mut orientations = Vec::<Orientation>::new();
+    orientations.resize(dbg.unitigs.sequence_count(), Orientation::Forward);
+    let mut visited = vec![false; dbg.unitigs.sequence_count()];
+
+    // Orient the terminals
+    for v in terminal_nodes {
+        let v_orientation = get_terminal_orientation(dbg, v);
+        bfs_from(v, v_orientation, dbg, &mut visited, &mut orientations);
+    }
+
+    // BFS from the rest.
+    for component_root in 0..dbg.unitigs.sequence_count(){
+
+        if visited[component_root]{
+            continue;
+        }
+
+        bfs_from(component_root, Forward, dbg, &mut visited, &mut orientations);
+    }
+
+    orientations
+}
+
 pub fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
     let mut orientations = Vec::<Orientation>::new();
     orientations.resize(dbg.unitigs.sequence_count(), Orientation::Forward);
@@ -25,7 +51,7 @@ pub fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
             continue;
         }
 
-        bfs_from(component_root, dbg, &mut visited, &mut orientations);
+        bfs_from(component_root, Forward, dbg, &mut visited, &mut orientations);
         n_components += 1;
     }
 
@@ -39,7 +65,7 @@ pub fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
             continue;
         }
 
-        bfs_from(component_root, dbg, &mut visited, &mut orientations);
+        bfs_from(component_root, Forward, dbg, &mut visited, &mut orientations);
         n_components += 1;
     }
 
@@ -49,9 +75,10 @@ pub fn pick_orientations(dbg: &dbg::DBG) -> Vec<Orientation>{
 }
 
 fn is_terminal(dbg: &dbg::DBG, unitig_id: usize) -> bool{
+    // Todo: prove that this is correct
     let mut has_fw = false;
     let mut has_bw = false;
-    for e in dbg.edges[unitig_id].iter(){
+    for e in dbg.edges[unitig_id].iter(){ 
         if e.from == e.to{
             continue; // Self-loops don't count
         }
@@ -62,11 +89,26 @@ fn is_terminal(dbg: &dbg::DBG, unitig_id: usize) -> bool{
     !(has_fw && has_bw)
 }
 
-fn bfs_from(root: usize, dbg: &dbg::DBG, visited: &mut [bool], orientations: &mut [Orientation]){
+// Assumes unitig_id is a terminal node
+fn get_terminal_orientation(dbg: &dbg::DBG, unitig_id: usize) -> Orientation{
+    let has_fw = dbg.edges[unitig_id].iter().filter(|e| e.from != e.to).any(|e| e.from_orientation == Forward);
+    let has_bw = dbg.edges[unitig_id].iter().filter(|e| e.from != e.to).any(|e| e.from_orientation == Reverse);
+    assert!(!has_fw || !has_bw);
+    if has_fw {
+        // In forward orientation this unitig is always a source.
+        // Which means that in reverse orientation it is always a sink
+        Reverse 
+    } else {
+        Forward
+    }
+}
+
+fn bfs_from(root: usize, root_orientation: Orientation, dbg: &dbg::DBG, visited: &mut [bool], orientations: &mut [Orientation]){
     let mut queue = std::collections::VecDeque::<(usize, Orientation)>::new();
 
     // Arbitrarily orient the root as forward
-    queue.push_back((root, Orientation::Forward));
+    //queue.push_back((root, Orientation::Forward));
+    queue.push_back((root, root_orientation));
 
     // BFS from root and orient all reachable unitigs the same way
     while let Some((unitig_id, orientation)) = queue.pop_front(){
