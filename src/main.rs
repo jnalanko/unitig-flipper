@@ -27,6 +27,7 @@ fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWr
 
     info!("Writing output");
 
+    #[allow(clippy::needless_range_loop)] // We need the index for get(i) also
     for i in 0..dbg.unitigs.sequence_count(){
         let orientation = orientations[i];
         let rec: OwnedRecord = match orientation{
@@ -44,7 +45,7 @@ fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWr
 
 
 // Returns the number of unitigs that do not have a predecessor
-fn evaluate(choices: &Vec<Orientation>, dbg: &dbg::DBG) -> usize{
+fn evaluate(choices: &[Orientation], dbg: &dbg::DBG) -> usize{
     let mut has_pred = vec![false; dbg.unitigs.sequence_count()];
 
     for v in 0..dbg.unitigs.sequence_count(){
@@ -118,7 +119,7 @@ mod tests{
 
         for seq in seqs{
             let rc = jseqio::reverse_complement(seq);
-            fw_db.push_record(RefRecord{head: b"", seq: seq, qual: None});
+            fw_db.push_record(RefRecord{head: b"", seq, qual: None});
             rc_db.push_record(RefRecord{head: b"", seq: rc.as_slice(), qual: None});
         }
 
@@ -129,10 +130,10 @@ mod tests{
     fn straight_line(){
         // Input
         let k = 3;
-        let data = vec![b"TCG", b"ATC", b"ATG", b"ACC", b"CCG"];
+        let data = [b"TCG", b"ATC", b"ATG", b"ACC", b"CCG"];
 
         // Two possible answers
-        let ans1 = vec![b"CGA", b"GAT", b"ATG", b"ACC", b"CCG"];
+        let ans1 = [b"CGA", b"GAT", b"ATG", b"ACC", b"CCG"];
         let ans2: Vec<Vec<u8>> = ans1.iter().map(|s| jseqio::reverse_complement(s.as_slice())).collect();
 
         // Run the test

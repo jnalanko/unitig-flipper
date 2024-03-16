@@ -43,9 +43,9 @@ pub struct Edge{
     pub to_orientation: Orientation,
 }
 
-fn insert_if_not_present<'key, 'borrow>(map: &'borrow mut HashMap<&'key [u8], Vec<MapValue>>, key: &'key [u8]){
+fn insert_if_not_present<'key>(map: &mut HashMap<&'key [u8], Vec<MapValue>>, key: &'key [u8]){
     if !map.contains_key(key){
-        map.insert(&key, Vec::<MapValue>::new());
+        map.insert(key, Vec::<MapValue>::new());
     }
 }
 
@@ -54,7 +54,7 @@ pub struct DBG{
     pub edges: Vec<Vec<Edge>> // edges[i] = outgoing edges from unitig i
 }
 
-fn push_edges(from: usize, from_orientation: Orientation, to_orientation: Orientation, to_position: Position, linking_kmer: &[u8], edges: &mut Vec<Vec<Edge>>, borders: &HashMap<&[u8], Vec<MapValue>>){
+fn push_edges(from: usize, from_orientation: Orientation, to_orientation: Orientation, to_position: Position, linking_kmer: &[u8], edges: &mut [Vec<Edge>], borders: &HashMap<&[u8], Vec<MapValue>>){
     if let Some(vec) = borders.get(linking_kmer){
         for x in vec.iter(){
             if x.position == to_position {
@@ -99,7 +99,7 @@ pub fn build_dbg(unitigs: SeqDB, unitigs_rc: SeqDB, k: usize) -> DBG{
 
     log::info!("Finding overlaps");
     let mut edges = Vec::<Vec::<Edge>>::new();
-    edges.resize_with(n, || Vec::<Edge>::new()); // Allocate n edge lists
+    edges.resize_with(n, Vec::<Edge>::new); // Allocate n edge lists
 
     // Build edges
     for i in 0..n{
