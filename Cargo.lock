@@ -235,6 +235,7 @@ dependencies = [
 [[package]]
 name = "jseqio"
 version = "0.1.0"
+source = "git+https://github.com/jnalanko/jseqio?rev=826c6b591854801eea72d20ad21e1bbc958f5cdb#826c6b591854801eea72d20ad21e1bbc958f5cdb"
 dependencies = [
  "ex",
  "flate2",
