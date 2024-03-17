@@ -179,9 +179,10 @@ fn walk_from(mut v: usize, dir: Direction, oris: &mut [Orientation], visited: &m
     if dir == Direction::Backward {
         // If we are going backward, it's the same as walking forward but
         // starting from the reverse complement twin node.
-        v = (v + dbg.n_unitigs) % dbg.n_unitigs;
+        v = dbg.twin(v);
     }
 
+    //eprintln!("walking from {} in direction {:?}", v % dbg.n_unitigs, dir);
     loop {
 
         if visited[v % dbg.n_unitigs] { return }
@@ -193,6 +194,7 @@ fn walk_from(mut v: usize, dir: Direction, oris: &mut [Orientation], visited: &m
             (Direction::Backward, true) => Orientation::Reverse,
             (Direction::Backward, false) => Orientation::Forward,
         };
+        //eprintln!("Oriented {} to {:?}", v % dbg.n_unitigs, oris[v % dbg.n_unitigs]);
 
         let mut have_next = false;
         for &u in dbg.out_edges[v].iter() {
@@ -233,11 +235,17 @@ pub fn pick_orientations_simplitigs(dbg: &DBG) -> Vec<Orientation>{
 
     let mut visited = vec![false; n];
 
+    let mut string_count = 0_usize;
     for v in 0..n {
-        walk_from(v, Direction::Forward, &mut orientations, &mut visited, dbg);
-        visited[v] = false;
-        walk_from(v, Direction::Backward, &mut orientations, &mut visited, dbg);
+        if !visited[v] {
+            walk_from(v, Direction::Forward, &mut orientations, &mut visited, dbg); // Visits v
+            visited[v] = false;
+            walk_from(v, Direction::Backward, &mut orientations, &mut visited, dbg); // Visits v again
+            string_count += 1;
+        }
     }
+
+    eprintln!("Constructed {} strings", string_count);
 
     orientations
 }
@@ -259,4 +267,90 @@ pub fn evaluate(choices: &[Orientation], dbg: &DBG) -> usize{
     
     // Return the number of 1-bit in has_pred
     has_pred.iter().fold(0_usize, |sum, &x| sum + x as usize)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::{RngCore, SeedableRng};
+    use rand::rngs::StdRng;
+    
+    fn generate_random_dna_string(length: usize, seed: u64) -> Vec<u8> {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let alphabet: Vec<u8> = vec![b'A', b'C', b'G', b'T'];
+    
+        let mut s = Vec::<u8>::new();
+        for _ in 0..length{
+            s.push(alphabet[(rng.next_u64() % 4) as usize]);
+        }
+        s
+    }
+
+    fn change(c: u8) -> u8 {
+        match c {
+            b'A' => b'C',
+            b'C' => b'G',
+            b'G' => b'T',
+            b'T' => b'A',
+            _ => panic!(),
+        }
+    }
+    
+
+    #[test]
+    fn test_rethink(){
+        // Make a graph like this
+        // o--\          /--o 
+        //     >--------< 
+        // o--/          \--o
+
+        let seed = 123;
+        let S = generate_random_dna_string(100, seed);
+        let k = 10;
+
+        let s1 = S[20..30].to_vec();
+
+        let mut s2 = s1.to_owned();
+        s2[0] = change(s2[0]);
+
+        let mut s_middle = S[21..31].to_owned();
+        let mut s_middle2 = S[22..50].to_owned();
+
+        let s3 = S[41..51].to_vec();
+        let mut s4 = s3.to_owned();
+        s4[9] = change(s4[9]);
+
+
+        jseqio::reverse_complement_in_place(&mut s_middle);
+        let seqs = vec![s_middle,s1,s2,s_middle2,s3,s4];
+
+        for s in seqs.iter() {
+            eprintln!("{}", String::from_utf8_lossy(s));
+        }
+
+        let rc_seqs = seqs.iter().map(|s| jseqio::reverse_complement(s));
+
+        let mut db = jseqio::seq_db::SeqDB::new();
+        for seq in seqs.iter() {
+            db.push_seq(seq);
+        }
+
+        let mut rc_db = jseqio::seq_db::SeqDB::new();
+        for rc_seq in rc_seqs {
+            rc_db.push_seq(&rc_seq);
+        }
+
+        let dbg = DBG::build(db, rc_db, k);
+
+        let orientations = pick_orientations_simplitigs(&dbg);
+        for ori in orientations.iter() {
+            dbg!(&ori);
+        }
+
+        let n_sources = evaluate(&orientations, &dbg);
+        dbg!(n_sources);
+
+        assert_eq!(n_sources, 2);
+
+    }    
 }
