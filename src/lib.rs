@@ -168,38 +168,7 @@ mod tests {
         }
     }
     
-
-    #[test]
-    fn test_rethink(){
-        // Make a graph like this
-        // o--\          /--o 
-        //     >--------< 
-        // o--/          \--o
-
-        let seed = 123;
-        let S = generate_random_dna_string(100, seed);
-        let k = 10;
-
-        let s1 = S[20..30].to_vec();
-
-        let mut s2 = s1.to_owned();
-        s2[0] = change(s2[0]);
-
-        let mut s_middle = S[21..31].to_owned();
-        let mut s_middle2 = S[22..50].to_owned();
-
-        let s3 = S[41..51].to_vec();
-        let mut s4 = s3.to_owned();
-        s4[9] = change(s4[9]);
-
-
-        jseqio::reverse_complement_in_place(&mut s_middle);
-        let seqs = vec![s_middle,s1,s2,s_middle2,s3,s4];
-
-        for s in seqs.iter() {
-            eprintln!("{}", String::from_utf8_lossy(s));
-        }
-
+    fn get_dbg(seqs: Vec<&[u8]>, k: usize) -> DBG {
         let rc_seqs = seqs.iter().map(|s| jseqio::reverse_complement(s));
 
         let mut db = jseqio::seq_db::SeqDB::new();
@@ -212,17 +181,64 @@ mod tests {
             rc_db.push_seq(&rc_seq);
         }
 
-        let dbg = DBG::build(db, rc_db, k);
+        DBG::build(db, rc_db, k)
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn sanity_check_algorithms(){
+        // Make a graph like this
+        // o--\          /--o 
+        //     >--------< 
+        // o--/          \--o
+
+        let seed = 123;
+        let S = generate_random_dna_string(100, seed);
+        let k = 10;
+
+        let s1 = S[20..30].to_vec();
+        let mut s2 = s1.to_owned();
+        s2[0] = change(s2[0]);
+
+        let mut s_middle = S[21..31].to_owned();
+        let s_middle2 = S[22..50].to_owned();
+
+        let s3 = S[41..51].to_vec();
+        let mut s4 = s3.to_owned();
+        s4[9] = change(s4[9]);
+
+        jseqio::reverse_complement_in_place(&mut s_middle);
+
+        // Run switching BFS
+
+        // Start with s1 so that we see that the search switches backward at middle
+        // Todo: make sure the assert_eq! later would fail if this does not happen.
+        let dbg = get_dbg(vec![&s1, &s2, &s_middle, &s_middle2, &s3, &s4], k);
 
         let orientations = pick_orientations_with_switching_bfs(&dbg);
         for ori in orientations.iter() {
             dbg!(&ori);
         }
 
-        let n_sources = evaluate(&orientations, &dbg);
+        let n_has_pred = evaluate(&orientations, &dbg);
+        let n_sources = dbg.n_unitigs - n_has_pred;
         dbg!(n_sources);
+        assert_eq!(n_sources, 2);
 
-        assert_eq!(n_sources, 3);
+        // Run non-switching BFS
+
+        // Start with s_middle, which reversed, so we see that the search goes both ways
+        let dbg = get_dbg(vec![&s_middle, &s1, &s2, &s_middle2, &s3, &s4], k);
+
+        let orientations = pick_orientations_with_non_switching_bfs(&dbg);
+        for ori in orientations.iter() {
+            dbg!(&ori);
+        }
+
+        let n_has_pred = evaluate(&orientations, &dbg);
+        let n_sources = dbg.n_unitigs - n_has_pred;
+        dbg!(n_sources);
+        assert_eq!(n_sources, 2);
 
     }    
 }
