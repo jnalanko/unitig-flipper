@@ -1,5 +1,6 @@
 pub mod dbg;
 pub mod dbg_rethink;
+pub mod simplitigs;
 
 use log::info;
 use dbg::Orientation;
