@@ -39,10 +39,10 @@ fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWr
     info!("{}/{} unitigs have a predecessor ({:.2}%)", n_with_predecessor, dbg.unitigs.sequence_count(), 100.0 * n_with_predecessor as f64 / dbg.unitigs.sequence_count() as f64);
     */
 
-    info!("Running rethink");
     let dbg_new = dbg_rethink::DBG::build(forward_seqs, reverse_seqs, k);
     //let orientations = dbg_rethink::pick_orientations_simplitigs(&dbg_new);
-    let orientations = dbg_rethink::pick_orientations_rethink(&dbg_new);
+    //let orientations = dbg_rethink::pick_orientations_rethink(&dbg_new);
+    let orientations = dbg_rethink::pick_orientations_new_search(&dbg_new);
 
     info!("Evaluating the solution");
     let n_with_predecessor = dbg_rethink::evaluate(&orientations, &dbg_new);

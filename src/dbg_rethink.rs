@@ -138,6 +138,42 @@ impl DBG {
     }
 }
 
+fn new_search(mut root: usize, root_dir: Direction, oris: &mut [Orientation], visited: &mut [bool], dbg: &DBG ) {
+
+    if root_dir == Direction::Backward {
+        // If we are going backward, it's the same as walking forward but
+        // starting from the reverse complement twin node.
+        root = dbg.twin(root);
+    }
+
+    let mut queue = std::collections::VecDeque::<(usize, Direction)>::new(); // Nodes from directed graph on [0, 2n), walking in Direction
+    queue.push_back((root, root_dir));
+
+    while let Some((v, dir)) = queue.pop_front() {
+
+        if visited[v % dbg.n_unitigs] { continue }
+        visited[v % dbg.n_unitigs] = true;
+
+        oris[v % dbg.n_unitigs] = match (dir, v < dbg.n_unitigs) {
+            (Direction::Forward, true) => Orientation::Forward,
+            (Direction::Forward, false) => Orientation::Reverse,
+            (Direction::Backward, true) => Orientation::Reverse,
+            (Direction::Backward, false) => Orientation::Forward,
+        };
+
+        // Keep walking in the same direction
+        for &u in dbg.out_edges[v].iter() {
+            queue.push_back((u, dir));
+        }
+
+        // Switch direction
+        for &u in dbg.out_edges[dbg.twin(v)].iter() {
+            queue.push_back((u, dir.flip()));
+        }
+    }
+
+}
+
 fn bfs_from(mut root: usize, dir: Direction, oris: &mut [Orientation], visited: &mut [bool], dbg: &DBG ) {
 
     if dir == Direction::Backward {
@@ -234,6 +270,21 @@ pub fn pick_orientations_rethink(dbg: &DBG) -> Vec<Orientation>{
             visited[v] = false;
             bfs_from(v, Direction::Backward, &mut orientations, &mut visited, dbg); // Visits v again
         }
+    };
+
+
+    orientations
+}
+
+pub fn pick_orientations_new_search(dbg: &DBG) -> Vec<Orientation>{
+    let n = dbg.n_unitigs;
+    let mut orientations = Vec::<Orientation>::new();
+    orientations.resize(n, Orientation::Forward);
+
+    let mut visited = vec![false; n];
+
+    for v in 0..n {
+        new_search(v, Direction::Forward, &mut orientations, &mut visited, dbg); // Visits v
     };
 
 
