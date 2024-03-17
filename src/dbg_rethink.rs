@@ -159,6 +159,57 @@ fn bfs_from(root: usize, oris: &mut [Orientation], visited: &mut [bool], dbg: &D
 
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum Direction{
+    Forward,
+    Backward,
+}
+
+impl Direction {
+    pub fn flip(&self) -> Direction {
+        match self {
+            Direction::Forward => Direction::Backward,
+            Direction::Backward => Direction::Forward,
+        }
+    }
+}
+
+fn walk_from(mut v: usize, dir: Direction, oris: &mut [Orientation], visited: &mut [bool], dbg: &DBG) {
+
+    if dir == Direction::Backward {
+        // If we are going backward, it's the same as walking forward but
+        // starting from the reverse complement twin node.
+        v = (v + dbg.n_unitigs) % dbg.n_unitigs;
+    }
+
+    loop {
+
+        if visited[v % dbg.n_unitigs] { return }
+        visited[v % dbg.n_unitigs] = true;
+
+        oris[v % dbg.n_unitigs] = match (dir, v < dbg.n_unitigs) {
+            (Direction::Forward, true) => Orientation::Forward,
+            (Direction::Forward, false) => Orientation::Reverse,
+            (Direction::Backward, true) => Orientation::Reverse,
+            (Direction::Backward, false) => Orientation::Forward,
+        };
+
+        let mut have_next = false;
+        for &u in dbg.out_edges[v].iter() {
+            if !visited[u % dbg.n_unitigs] {
+                have_next = true;
+                v = u;
+                break;
+            }
+        }
+
+        if !have_next {
+            break;
+        }
+    }
+
+}
+
 pub fn pick_orientations_rethink(dbg: &DBG) -> Vec<Orientation>{
     let n = dbg.n_unitigs;
     let mut orientations = Vec::<Orientation>::new();
@@ -171,6 +222,22 @@ pub fn pick_orientations_rethink(dbg: &DBG) -> Vec<Orientation>{
         bfs_from(v, &mut orientations, &mut visited, dbg);
     });
 
+
+    orientations
+}
+
+pub fn pick_orientations_simplitigs(dbg: &DBG) -> Vec<Orientation>{
+    let n = dbg.n_unitigs;
+    let mut orientations = Vec::<Orientation>::new();
+    orientations.resize(n, Orientation::Forward);
+
+    let mut visited = vec![false; n];
+
+    for v in 0..n {
+        walk_from(v, Direction::Forward, &mut orientations, &mut visited, dbg);
+        visited[v] = false;
+        walk_from(v, Direction::Backward, &mut orientations, &mut visited, dbg);
+    }
 
     orientations
 }

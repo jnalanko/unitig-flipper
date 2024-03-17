@@ -11,7 +11,7 @@ fn reverse_complement(s: &str) -> String {
     }).collect::<String>().chars().rev().collect()
 }
 
-fn extend_simplitig_forward(k: usize, mut simplitig: String, mut k_set: &mut HashSet<String>) -> String {
+fn extend_simplitig_forward(k: usize, mut simplitig: String, k_set: &mut HashSet<String>) -> String {
     let mut extending = true;
     while extending {
         extending = false;
@@ -74,3 +74,7 @@ mod tests {
     }
 
 }
+
+// Todo:
+// String -> Vec[u8]
+// Use unitigs 
