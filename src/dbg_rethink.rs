@@ -9,9 +9,10 @@ use crate::dbg::Orientation;
 // There is an edge from v to u if v[|v|-k..|v|-1] = u[0..k-1]
 // We store neighbor lists for both incoming and outgoing edges.
 pub struct DBG {
-    out_edges: Vec<Vec<usize>>,
-    in_edges: Vec<Vec<usize>>,
-    n_unitigs: usize,
+    pub out_edges: Vec<Vec<usize>>,
+    pub in_edges: Vec<Vec<usize>>,
+    pub n_unitigs: usize,
+    pub unitig_db: jseqio::seq_db::SeqDB,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -29,7 +30,7 @@ struct MapValue{ // Used internally in construction
 impl DBG {
 
     fn new(n_unitigs : usize) -> Self {
-        DBG{out_edges: vec![Vec::new(); n_unitigs * 2], in_edges: vec![Vec::new(); n_unitigs * 2], n_unitigs}
+        DBG{out_edges: vec![Vec::new(); n_unitigs * 2], in_edges: vec![Vec::new(); n_unitigs * 2], n_unitigs, unitig_db: jseqio::seq_db::SeqDB::new()}
     }
 
     pub fn twin(&self, v: usize) -> usize {
@@ -131,12 +132,19 @@ impl DBG {
             }
         }
 
+        dbg.unitig_db = unitigs;
         dbg
 
     }
 }
 
-fn bfs_from(root: usize, oris: &mut [Orientation], visited: &mut [bool], dbg: &DBG ) {
+fn bfs_from(mut root: usize, dir: Direction, oris: &mut [Orientation], visited: &mut [bool], dbg: &DBG ) {
+
+    if dir == Direction::Backward {
+        // If we are going backward, it's the same as walking forward but
+        // starting from the reverse complement twin node.
+        root = dbg.twin(root);
+    }
 
     let mut queue = std::collections::VecDeque::<usize>::new();
     queue.push_back(root);
@@ -145,12 +153,13 @@ fn bfs_from(root: usize, oris: &mut [Orientation], visited: &mut [bool], dbg: &D
 
         if visited[v % dbg.n_unitigs] { continue }
         visited[v % dbg.n_unitigs] = true;
-        if v < dbg.n_unitigs {
-            oris[v % dbg.n_unitigs] = Orientation::Forward;
-        }
-        else {
-            oris[v % dbg.n_unitigs] = Orientation::Reverse;
-        }
+
+        oris[v % dbg.n_unitigs] = match (dir, v < dbg.n_unitigs) {
+            (Direction::Forward, true) => Orientation::Forward,
+            (Direction::Forward, false) => Orientation::Reverse,
+            (Direction::Backward, true) => Orientation::Reverse,
+            (Direction::Backward, false) => Orientation::Forward,
+        };
 
         for &u in dbg.out_edges[v].iter() {
             queue.push_back(u);
@@ -219,10 +228,13 @@ pub fn pick_orientations_rethink(dbg: &DBG) -> Vec<Orientation>{
 
     let mut visited = vec![false; n];
 
-    // For all source nodes
-    (0..2*n).filter(|&v| !dbg.out_edges[v].is_empty()).for_each(|v|{
-        bfs_from(v, &mut orientations, &mut visited, dbg);
-    });
+    for v in 0..n {
+        if !visited[v] {
+            bfs_from(v, Direction::Forward, &mut orientations, &mut visited, dbg); // Visits v
+            visited[v] = false;
+            bfs_from(v, Direction::Backward, &mut orientations, &mut visited, dbg); // Visits v again
+        }
+    };
 
 
     orientations

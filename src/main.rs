@@ -41,7 +41,8 @@ fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWr
 
     info!("Running rethink");
     let dbg_new = dbg_rethink::DBG::build(forward_seqs, reverse_seqs, k);
-    let orientations = dbg_rethink::pick_orientations_simplitigs(&dbg_new);
+    //let orientations = dbg_rethink::pick_orientations_simplitigs(&dbg_new);
+    let orientations = dbg_rethink::pick_orientations_rethink(&dbg_new);
 
     info!("Evaluating the solution");
     let n_with_predecessor = dbg_rethink::evaluate(&orientations, &dbg_new);
@@ -51,17 +52,15 @@ fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWr
     let n_forward = orientations.iter().fold(0_usize, |acc, &x| (acc + (x == Orientation::Forward) as usize));
     info!("{}% Forward", 100.0 * n_forward as f64 / n_seqs as f64);
 
-    /*
-
     info!("Writing output");
 
     #[allow(clippy::needless_range_loop)] // We need the index for get(i) also
-    for i in 0..dbg.unitigs.sequence_count(){
+    for i in 0..dbg_new.n_unitigs{
         let orientation = orientations[i];
         let rec: OwnedRecord = match orientation{
-            Orientation::Forward => dbg.unitigs.get(i).to_owned(),
+            Orientation::Forward => dbg_new.unitig_db.get(i).to_owned(),
             Orientation::Reverse => {
-                let mut unitig = dbg.unitigs.get(i).to_owned();
+                let mut unitig = dbg_new.unitig_db.get(i).to_owned();
                 unitig.reverse_complement();
                 unitig
             }
@@ -69,7 +68,6 @@ fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWr
 
         seqs_out.write_owned_record(&rec).unwrap();
     }    
-    */
 }
 
 fn main() {
