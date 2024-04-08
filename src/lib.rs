@@ -2,6 +2,40 @@ pub mod dbg;
 
 use dbg::*;
 
+/// A stream of ASCII-encoded DNA-sequences. This is not necessarily a standard Rust iterator
+/// because we want to support streaming sequences from disk, which is not possible
+/// with a regular iterator due to lifetime constraints of the Iterator trait.
+pub trait SeqStream<'a>
+{
+    /// Return the next sequence in the stream, or None if the stream is exhausted.
+    /// You may be wondering: why such complicated lifetime annotations?
+    /// Lifetime 'a is not used in this signature at all. We just state that 'a is longer than 'b.
+    /// The existence of this free lifetime parameter 'a will be useful for implementors
+    /// of this trait who now have one more lifetime parameter to play with. See the comments
+    /// in `impl<'a, I: Iterator<Item = &'a [u8]>> SeqStream<'a> for I` for an explanation
+    /// for why this is required.
+    fn stream_next<'b>(&'b mut self) -> Option<&'b [u8]> where 'a : 'b;
+}
+
+/// Any iterator of &'a [u8] that is valid for 'a can work as a SeqStream<'a>.
+impl<'a, 'c: 'a, I: Iterator<Item=&'c [u8]>> SeqStream<'a> for I
+{
+    fn stream_next<'b>(&'b mut self) -> Option<&'b [u8]> where 'a : 'b {
+        // We need the bound 'a: 'b because otherwise the compiler is unhappy because
+        // we are returning &'a but the function signature says we need to return &'b.
+        // This is okay only if 'a is a subtype of 'b, i.e. 'a lasts longer than 'b.
+        // In that case, 'a is also a 'b so we can do the conversion. But if we don't
+        // explicitly require 'a: 'b, then the compiler does not see any relationship
+        // between 'a and 'b and refuses to do the conversion. But if we have 'a: 'b
+        // here, then we also need it in the trait definition, even though 'a does not
+        // appear in the function signature of the trait. But we need to say already in
+        // the trait definition that there exists some lifetime 'a that is longer than
+        // 'b in order to be able to relate the lifetime of the items to the lifetime
+        // of the borrow in this implementation.
+        self.next()
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum Direction{
     Forward,
@@ -15,6 +49,27 @@ impl Direction {
             Direction::Backward => Direction::Forward,
         }
     }
+}
+
+/// Given a stream of unitigs, returns a vector of orientations, one for each sequence, aiming to
+/// minimize the number of unitigs which do not have an incoming edge in the de Bruijn graph
+/// of order k.
+pub fn optimize_unitig_orientation<'a, SS: SeqStream<'a>>(mut input: SS, k: usize) -> Vec<Orientation>{
+    let mut db = jseqio::seq_db::SeqDB::new();
+    let mut rc_db = jseqio::seq_db::SeqDB::new();
+    let mut rc_buf = Vec::<u8>::new();
+    while let Some(seq) = input.stream_next() {
+        db.push_seq(seq);
+
+        rc_buf.clear();
+        rc_buf.extend(seq);
+        jseqio::reverse_complement_in_place(&mut rc_buf);
+        rc_db.push_seq(&rc_buf);
+    }
+
+    let dbg = DBG::build(db, rc_db, k);
+
+    pick_orientations_with_non_switching_bfs(&dbg)
 }
 
 // BFS forward or backward from the root, such that we do not switch direction during the search
@@ -143,6 +198,8 @@ pub fn evaluate(choices: &[Orientation], dbg: &DBG) -> usize{
 
 #[cfg(test)]
 mod tests {
+    use std::io::BufReader;
+
     use super::*;
     use rand::{RngCore, SeedableRng};
     use rand::rngs::StdRng;
@@ -241,5 +298,29 @@ mod tests {
         assert_eq!(n_sources, 2);
 
     }    
+
+    use Orientation::*;
+
+    #[test]
+    fn straight_line(){
+        // Input
+        let k = 3;
+        let data: Vec<&[u8]> = vec![b"TCG", b"ATC", b"ATG", b"ACC", b"CCG"];
+
+        // TCG
+        // ATC
+        // ATG
+        // ACC
+        // CCG
+
+        // Run the test
+        let orientations = optimize_unitig_orientation(data.clone().into_iter(), k);
+
+        // Two possible answers
+        let ans1 = vec![Reverse, Reverse, Forward, Forward, Forward];
+        let ans2 = vec![Forward, Forward, Reverse, Reverse, Reverse];
+        assert!(orientations == ans1 || orientations == ans2);
+
+    }
 }
 

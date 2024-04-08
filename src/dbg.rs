@@ -14,19 +14,19 @@ pub struct DBG {
     pub unitig_db: jseqio::seq_db::SeqDB,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum Position{ // Used internally in construction
     Start,
     End,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Orientation{
     Forward,
     Reverse,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 struct MapValue{ // Used internally in construction
     unitig_id: usize,
     position: Position,

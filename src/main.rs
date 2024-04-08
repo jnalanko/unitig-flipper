@@ -7,44 +7,19 @@ use clap::{Command, Arg};
 
 use log::info;
 
-use unitig_flipper;
 use unitig_flipper::dbg::Orientation;
-use jseqio::seq_db::SeqDB;
+use unitig_flipper::optimize_unitig_orientation;
+use unitig_flipper::SeqStream;
 
-fn run(forward_seqs: SeqDB, reverse_seqs: SeqDB, seqs_out: &mut impl SeqRecordWriter, k: usize){
+struct MyReader {
+    inner: jseqio::reader::DynamicFastXReader,
+}
 
-    let n_seqs = forward_seqs.sequence_count();
+impl<'a> SeqStream<'a> for MyReader{
 
-    info!("Building bidirected DBG edges...");
-    let dbg_new = unitig_flipper::dbg::DBG::build(forward_seqs, reverse_seqs, k);
-
-    info!("Choosing unitig orientations");
-    let orientations = unitig_flipper::pick_orientations_with_non_switching_bfs(&dbg_new);
-
-    info!("Evaluating the solution");
-    let n_with_predecessor = unitig_flipper::evaluate(&orientations, &dbg_new);
-
-    info!("{}/{} unitigs have a predecessor ({:.2}%)", n_with_predecessor, n_seqs, 100.0 * n_with_predecessor as f64 / n_seqs as f64);
-
-    let n_forward = orientations.iter().fold(0_usize, |acc, &x| (acc + (x == Orientation::Forward) as usize));
-    info!("{}% Forward", 100.0 * n_forward as f64 / n_seqs as f64);
-
-    info!("Writing output");
-
-    #[allow(clippy::needless_range_loop)] // We need the index for get(i) also
-    for i in 0..dbg_new.n_unitigs{
-        let orientation = orientations[i];
-        let rec: OwnedRecord = match orientation{
-            Orientation::Forward => dbg_new.unitig_db.get(i).to_owned(),
-            Orientation::Reverse => {
-                let mut unitig = dbg_new.unitig_db.get(i).to_owned();
-                unitig.reverse_complement();
-                unitig
-            }
-        };
-
-        seqs_out.write_owned_record(&rec).unwrap();
-    }    
+    fn stream_next<'b>(&'b mut self) -> Option<&'b [u8]> where 'a : 'b {
+        self.inner.read_next().unwrap().map(|rec| rec.seq)
+    }
 }
 
 fn main() {
@@ -87,61 +62,30 @@ fn main() {
     let reader = DynamicFastXReader::from_file(infile).unwrap();
     let mut writer = DynamicFastXWriter::new_to_file(outfile).unwrap();
 
-    info!("Reading and reverse-complementing sequences into memory");
-    let (db, rc_db) = reader.into_db_with_revcomp().unwrap();
-    run(db, rc_db, &mut writer, k);
+    let reader = MyReader{inner: reader};
 
-}
+    let orientations = optimize_unitig_orientation(reader, k);
 
-#[cfg(test)]
-mod tests{
-    use super::*;
-    use std::io::BufReader;
+    let n_forward = orientations.iter().fold(0_usize, |acc, &x| (acc + (x == Orientation::Forward) as usize));
+    info!("{}% Forward", 100.0 * n_forward as f64 / orientations.len() as f64);
 
-    fn helper_get_seq_dbs<'a>(seqs: impl IntoIterator<Item = &'a [u8]>) -> (SeqDB, SeqDB){
-        let mut fw_db = SeqDB::new();
-        let mut rc_db = SeqDB::new();
+    info!("Writing output");
 
-        for seq in seqs{
-            let rc = jseqio::reverse_complement(seq);
-            fw_db.push_record(RefRecord{head: b"", seq, qual: None});
-            rc_db.push_record(RefRecord{head: b"", seq: rc.as_slice(), qual: None});
-        }
+    let mut reader = DynamicFastXReader::from_file(infile).unwrap();
+    let mut seq_idx = 0_usize;
+    while let Some(rec) = reader.read_next().unwrap(){
+        let orientation = orientations[seq_idx];
+        let new_rec: OwnedRecord = match orientation{
+            Orientation::Forward => rec.to_owned(),
+            Orientation::Reverse => {
+                let mut unitig = rec.to_owned();
+                unitig.reverse_complement();
+                unitig
+            }
+        };
 
-        (fw_db, rc_db)
-    }
+        writer.write_owned_record(&new_rec).unwrap();
+        seq_idx += 1;
+    }    
 
-    #[test]
-    fn straight_line(){
-        // Input
-        let k = 3;
-        let data = [b"TCG", b"ATC", b"ATG", b"ACC", b"CCG"];
-
-        // Two possible answers
-        let ans1 = [b"CGA", b"GAT", b"ATG", b"ACC", b"CCG"];
-        let ans2: Vec<Vec<u8>> = ans1.iter().map(|s| jseqio::reverse_complement(s.as_slice())).collect();
-
-        // Run the test
-
-        let seq_iter = data.iter().map(|s| s.as_slice());
-    
-        let (fw_db, rc_db) = helper_get_seq_dbs(seq_iter);
-
-        let out_buf = Vec::<u8>::new();
-        let mut writer = FastXWriter::new(out_buf, jseqio::FileType::FASTA);
-
-        run(fw_db, rc_db, &mut writer, k);
-        let out_buf = writer.into_inner().unwrap(); // Get back the out buffer
-
-        let br = BufReader::new(std::io::Cursor::new(out_buf));
-        let reader = DynamicFastXReader::new(br).unwrap();
-        let out_db = reader.into_db().unwrap();
-        assert_eq!(data.len(), out_db.sequence_count());
-
-        let ans1_match = (0..ans1.len()).all(|i| ans1[i] == out_db.get(i).seq);
-        let ans2_match = (0..ans2.len()).all(|i| ans2[i] == out_db.get(i).seq);
-
-        assert!(ans1_match || ans2_match);
-
-    }
 }
