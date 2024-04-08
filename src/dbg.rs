@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use crate::Orientation;
 
 // If there are n unitigs, we have 2n nodes
 // Nodes 0..n-1 are the nodes in their orientations in the input, and
@@ -18,12 +19,6 @@ pub struct DBG {
 enum Position{ // Used internally in construction
     Start,
     End,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Orientation{
-    Forward,
-    Reverse,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

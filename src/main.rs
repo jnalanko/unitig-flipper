@@ -7,7 +7,7 @@ use clap::{Command, Arg};
 
 use log::info;
 
-use unitig_flipper::dbg::Orientation;
+use unitig_flipper::Orientation;
 use unitig_flipper::optimize_unitig_orientation;
 use unitig_flipper::SeqStream;
 

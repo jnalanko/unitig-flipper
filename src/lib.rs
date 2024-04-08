@@ -51,6 +51,12 @@ impl Direction {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Orientation{
+    Forward,
+    Reverse,
+}
+
 /// Given a stream of unitigs, returns a vector of orientations, one for each sequence, aiming to
 /// minimize the number of unitigs which do not have an incoming edge in the de Bruijn graph
 /// of order k.
