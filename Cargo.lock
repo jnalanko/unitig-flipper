@@ -209,8 +209,9 @@ dependencies = [
 
 [[package]]
 name = "jseqio"
-version = "0.1.0"
-source = "git+https://github.com/jnalanko/jseqio?rev=826c6b591854801eea72d20ad21e1bbc958f5cdb#826c6b591854801eea72d20ad21e1bbc958f5cdb"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb85776e78aa455d2fc9a0b19f21e72088e1967925d3724d19095ef3ef21e480"
 dependencies = [
  "ex",
  "flate2",
